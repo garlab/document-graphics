@@ -25,12 +25,11 @@ or tile without retaining an image for every item.
 
 ## Integration
 
-Requires Rust 1.90 or newer. The package is prepared for its first release; until
-then, consumers need the local dependency override described below.
+Requires Rust 1.90 or newer.
 
 ```toml
 [dependencies]
-document-graphics = "=0.1.0"
+document-graphics = "0.1"
 ```
 
 Handle the private worker argument before initializing the application:
@@ -79,9 +78,10 @@ deadline.
 
 The child receives source, theme and raster options over bounded private pipes;
 its inherited environment is cleared. Unix workers disable core dumps and have
-an eight-second cumulative CPU backstop. On macOS the sandbox denies file-data
-reads, writes, networking and child processes, and the parent samples resident
-memory against 256 MiB. Other platforms retain input/output bounds and deadlines,
+an eight-second cumulative CPU backstop. On macOS the worker's sandbox profile
+allows everything by default, then denies file-data reads, writes, networking and
+child processes; other operations, such as Mach service lookups, remain allowed.
+The parent samples resident memory against 256 MiB. Other platforms retain input/output bounds and deadlines,
 but do not yet have equivalent OS sandbox and resident-memory enforcement.
 
 The library owns these mechanisms. A terminal app can retain a five-second total
@@ -105,17 +105,8 @@ Shared renderer, SVG and protocol tests belong here. Application integration and
 policy tests stay with the consumers. On macOS, worker tests must run outside an
 enclosing sandbox so the child can install its own sandbox.
 
-For local development, add this entry to an untracked `.cargo/config.toml` in
-**each consumer**, adapting the relative path to the checkout layout:
+See [release checks](https://github.com/garlab/document-graphics/blob/main/docs/releasing.md)
+for testing changes in the consumers, packaging and consumer validation.
 
-```toml
-[patch.crates-io]
-document-graphics = { path = "../document-graphics" }
-```
-
-Run Cargo from that consumer's root. Keep the library checkout outside its
-`target/` directory so cleaning build artifacts cannot remove source. Published
-consumers use a versioned registry dependency; local overrides are temporary.
-See [release checks](https://github.com/garlab/document-graphics/blob/main/docs/releasing.md) for packaging and consumer validation.
-
-MIT; see [LICENSE](LICENSE). `katex-native` includes KaTeX fonts under OFL-1.1.
+MIT; see [LICENSE](https://github.com/garlab/document-graphics/blob/main/LICENSE).
+`katex-native` includes KaTeX fonts under OFL-1.1.

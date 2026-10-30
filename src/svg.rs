@@ -9,6 +9,7 @@ use std::sync::{
 pub const MAX_SOURCE: usize = 256 * 1024;
 static FONTS: OnceLock<Arc<usvg::fontdb::Database>> = OnceLock::new();
 #[derive(Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     Invalid,
     Unsupported,

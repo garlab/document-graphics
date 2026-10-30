@@ -13,7 +13,7 @@ categories = ["rendering", "text-processing"]
 include = ["src/**", "tests/**", "README.md", "LICENSE", "Cargo.toml"]
 
 [dependencies]
-katex-native = "=0.1.0"
+katex-native = "0.1"
 mermaid-rs-renderer = { version = "=0.3.1", default-features = false }
 resvg = { version = "0.45.1", default-features = false, features = ["text"] }
 roxmltree = "0.20"

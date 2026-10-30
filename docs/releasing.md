@@ -4,6 +4,21 @@ Run commands from the document-graphics repository root. Cargo discovers local
 configuration from the working directory; using `--manifest-path` from a
 consumer checkout can apply that consumer's overrides to the release build.
 
+## Local dependency overrides
+
+To build a consumer against a local checkout of this library, add this entry to
+an untracked `.cargo/config.toml` in **each consumer**, adapting the relative path
+to the checkout layout:
+
+```toml
+[patch.crates-io]
+document-graphics = { path = "../document-graphics" }
+```
+
+Run Cargo from that consumer's root. Keep the library checkout outside its
+`target/` directory so cleaning build artifacts cannot remove source. Published
+consumers use a versioned registry dependency; local overrides are temporary.
+
 ## Review and validation
 
 Review public API changes, source/raster limits, process cleanup and platform
@@ -24,7 +39,8 @@ review the archive's file list. Cargo.lock is tracked for reproducible repositor
 checks; consumers resolve transitive dependencies using their own lockfiles.
 The package includes library sources, tests, README, license and Cargo metadata.
 
-For renderer changes, check both consumers with local dependency overrides:
+For renderer changes, check both consumers with
+[local dependency overrides](#local-dependency-overrides):
 
 - In mdviewer: run Rust tests and `tests/terminal_smoke.py` against a built
   binary; inspect graphics in a compatible terminal at normal and narrow widths.
