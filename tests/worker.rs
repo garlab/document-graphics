@@ -18,31 +18,42 @@ fn main() {
     }
     let cancel = Arc::new(AtomicBool::new(false));
     let mut worker = Worker::spawn(&std::env::current_exe().unwrap(), "--mermaid-worker").unwrap();
+    // Each diagram's logical size, in both themes. A change means the renderer,
+    // resvg or the fonts moved the layout: review the images, then update it.
     let cases = [
         (
             "flowchart",
             "flowchart LR\n A[Read Markdown] --> B{Diagram?}\n B -->|Yes| C[Preview]\n B -->|No| D[Text]\n C --> E[Read]\n D --> E\n",
+            (705, 181),
         ),
         (
             "sequence",
             "sequenceDiagram\n participant R as Reader\n participant V as Viewer\n R->>V: Open file\n activate V\n V-->>R: Rendered preview\n deactivate V\n",
+            (450, 287),
         ),
         (
             "class",
             "classDiagram\n class Document {\n +String source\n +render()\n }\n Document --> Renderer\n",
+            (201, 304),
         ),
         (
             "state",
             "stateDiagram-v2\n [*] --> Reading\n Reading --> Rendering: diagram\n Rendering --> Reading: next block\n Reading --> [*]\n",
+            (214, 198),
         ),
-        ("er", "erDiagram\n DOCUMENT ||--o{ BLOCK : contains\n"),
+        (
+            "er",
+            "erDiagram\n DOCUMENT ||--o{ BLOCK : contains\n",
+            (196, 197),
+        ),
         (
             "subgraph",
             "flowchart LR\n subgraph Input\n A[File] --> B[Parser]\n end\n subgraph Output\n C[Diagram] --> D[Preview]\n end\n B --> C\n",
+            (779, 147),
         ),
     ];
     let mut times = Vec::new();
-    for (name, source) in cases {
+    for (name, source, (width, height)) in cases {
         for light in [false, true] {
             let start = Instant::now();
             let p = worker
@@ -57,6 +68,13 @@ fn main() {
                 .expect(name);
             let elapsed = start.elapsed().as_secs_f64() * 1000.;
             times.push(elapsed);
+            assert_eq!(
+                (p.original_width, p.original_height),
+                (width, height),
+                "{name}, light={light}: logical size"
+            );
+            // Every fixture fits the pixel cap at 2x, so none is scaled down.
+            assert_eq!((p.width, p.height), (2 * width, 2 * height), "{name}");
             assert!(p.width as usize * p.height as usize <= document_graphics::MAX_PIXELS);
             assert_eq!(p.rgba.len(), (p.width * p.height * 4) as usize);
             assert!(p.rgba.as_chunks::<4>().0.iter().any(|p| p[3] > 0));

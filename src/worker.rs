@@ -444,4 +444,47 @@ mod tests {
             );
         }
     }
+    /// The sandbox applies to a whole process, so `sandbox_probe` installs it in
+    /// a child run of this test binary.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_sandbox_denies_file_reads_writes_network_and_processes() {
+        let file = std::env::temp_dir().join(format!("document-graphics-{}", std::process::id()));
+        std::fs::write(&file, b"private").unwrap();
+        let output = Command::new(std::env::current_exe().unwrap())
+            .args(["worker::tests::sandbox_probe", "--exact", "--ignored"])
+            .env("DOCUMENT_GRAPHICS_SANDBOX_PROBE", &file)
+            .output()
+            .unwrap();
+        let contents = std::fs::read(&file).unwrap();
+        std::fs::remove_file(&file).unwrap();
+        let report = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output.status.success() && report.contains("1 passed"),
+            "{report}{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(contents, b"private");
+    }
+    #[cfg(target_os = "macos")]
+    #[test]
+    #[ignore = "run in a child process by the macOS sandbox test"]
+    fn sandbox_probe() {
+        // Never restrict the test runner itself, only the child started above.
+        let Some(file) = std::env::var_os("DOCUMENT_GRAPHICS_SANDBOX_PROBE") else {
+            return;
+        };
+        // Each operation works before the sandbox, so failing after is its doing.
+        let spawn = || Command::new("/usr/bin/true").status();
+        assert!(std::fs::read(&file).is_ok() && spawn().is_ok());
+        assert!(std::net::TcpListener::bind("127.0.0.1:0").is_ok());
+        restrict_worker().unwrap();
+        assert!(std::fs::read(&file).is_err(), "read a file");
+        assert!(std::fs::write(&file, b"changed").is_err(), "wrote a file");
+        assert!(
+            std::net::TcpListener::bind("127.0.0.1:0").is_err(),
+            "opened a socket"
+        );
+        assert!(spawn().is_err(), "started a process");
+    }
 }
