@@ -53,21 +53,32 @@ Compare image output and feature costs when behavior changes. Keep generated
 images and raw timing samples in ignored `target/` directories. A rename or
 repository move alone should preserve renderer output.
 
-## Manual publication
+## Publication
 
-After review and consumer validation, publish from this repository:
+The [release workflow](../.github/workflows/release.yml) publishes version tags
+through crates.io's Trusted Publishing; the repository stores no registry token.
+After review and consumer validation:
 
-```sh
-cargo publish --locked
-```
+1. Set the new version in `Cargo.toml`, run `cargo check` so `Cargo.lock` follows,
+   commit, and push `main`.
+2. Tag that commit and push the tag:
 
-There is no automatic publishing workflow.
+   ```sh
+   git tag -a vX.Y.Z -m release
+   git push origin vX.Y.Z
+   ```
+
+The workflow checks that the tag matches `Cargo.toml` and is on `main`, runs the
+tests and a dry-run publish, then publishes. Push `main` before the tag: if the
+tag's commit isn't on `main` yet, push it and re-run the workflow. A version
+already on crates.io is skipped, so re-running is safe. 0.1.0 was published by
+hand, since Trusted Publishing can only be set up for a crate that exists.
 
 In **each consumer**, remove only this crate's local override, update its version
 pin when needed, and resolve the registry package:
 
 ```sh
-cargo update -p document-graphics --precise 0.1.0
+cargo update -p document-graphics --precise X.Y.Z
 cargo check --locked
 ```
 
