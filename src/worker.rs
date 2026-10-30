@@ -287,6 +287,9 @@ impl Worker {
         if self.completed >= MAX_REQUESTS {
             return Err(io::Error::other("Diagram worker request limit reached"));
         }
+        let deadline = Instant::now()
+            .checked_add(timeout)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Invalid render timeout"))?;
         let bounds = options.bounds;
         let mut message = Vec::with_capacity(25 + source.len());
         message.extend_from_slice(b"NPV1");
@@ -301,9 +304,6 @@ impl Worker {
             .unwrap()
             .try_send((message, bounds))
             .map_err(|_| io::Error::other("Mermaid worker unavailable"))?;
-        let deadline = Instant::now()
-            .checked_add(timeout)
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Invalid render timeout"))?;
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(io::Error::new(
@@ -318,8 +318,20 @@ impl Worker {
             if resident_bytes(self.child.id()).is_some_and(|n| n > MAX_RESIDENT_BYTES) {
                 return Err(io::Error::other("Diagram exceeded its memory limit"));
             }
-            match self.replies.recv_timeout(Duration::from_millis(20)) {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            match self
+                .replies
+                .recv_timeout(remaining.min(Duration::from_millis(20)))
+            {
                 Ok(result) => {
+                    // A queued reply does not override cancellation or a deadline
+                    // reached while this thread was waiting to be scheduled.
+                    if cancel.load(Ordering::Relaxed) {
+                        return Err(io::ErrorKind::Interrupted.into());
+                    }
+                    if Instant::now() >= deadline {
+                        return Err(io::ErrorKind::TimedOut.into());
+                    }
                     self.completed += 1;
                     return result;
                 }
@@ -383,6 +395,38 @@ mod tests {
         assert!(serve(&mut &request[..], &mut output).is_err());
         assert!(output.is_empty());
     }
+    #[cfg(unix)]
+    #[test]
+    fn a_reply_after_a_short_deadline_is_rejected() {
+        let child = Command::new("sleep")
+            .arg("30")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut worker = Worker::connect(child).unwrap();
+        let (send, receive) = mpsc::sync_channel(1);
+        worker.replies = receive;
+        let delayed = thread::spawn(move || {
+            thread::sleep(Duration::from_millis(10));
+            let _ = send.send(Ok(None));
+        });
+        let error = worker
+            .render(
+                "flowchart LR; A-->B",
+                false,
+                RasterOptions::scaled(1.),
+                Duration::from_millis(1),
+                &AtomicBool::new(false),
+            )
+            .err()
+            .unwrap();
+        assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+        assert!(worker.requests.is_none());
+        assert_eq!(worker.requests_completed(), 0);
+        delayed.join().unwrap();
+    }
+
     #[cfg(unix)]
     #[test]
     fn timeouts_and_cancellation_kill_and_reap_partial_replies() {
