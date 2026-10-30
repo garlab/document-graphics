@@ -1,12 +1,13 @@
 [package]
-name = "native-preview"
+name = "document-graphics"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.90"
-description = "Bounded native Mermaid and SVG previews with isolated worker support."
+description = "Render graphics from untrusted documents to RGBA, with resource limits and isolated workers."
 license = "MIT"
 readme = "README.md"
-documentation = "https://docs.rs/native-preview"
+documentation = "https://docs.rs/document-graphics"
+repository = "https://github.com/garlab/document-graphics"
 keywords = ["mermaid", "svg", "preview", "rendering"]
 categories = ["rendering", "text-processing"]
 include = ["src/**", "tests/**", "README.md", "LICENSE", "Cargo.toml"]

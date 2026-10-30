@@ -1,4 +1,4 @@
-# native-preview
+# document-graphics
 
 Bounded native Mermaid and SVG rendering for terminal and GUI applications. The
 crate returns straight RGBA pixels and logical dimensions. It has no UI framework,
@@ -9,12 +9,34 @@ and ER relationships. Unsupported syntax returns `Ok(None)` through the worker;
 callers can retain the original source. SVG rendering uses bundled KaTeX fonts
 and rejects external resources, filters, reuse and foreign content.
 
+## Scope
+
+The library renders the graphical content of documents independently of their
+layout or user interface. Today it supports Mermaid diagrams and a restricted
+SVG subset. Image decoding, other diagram formats, music notation and game-record
+diagrams are possible future modules; they are not implemented here yet.
+Applications own document layout, interaction, scheduling and cache budgets.
+Equation layout remains in `katex-native`.
+
+New backends should remain optional and initialize only when used. Their own
+input limits and platform isolation requirements must be explicit. Future APIs
+may retain a bounded parsed model and render a selected fragment, position, page
+or tile without retaining an image for every item.
+
 ## Integration
+
+Requires Rust 1.90 or newer. The package is prepared for its first release; until
+then, consumers need the local dependency override described below.
+
+```toml
+[dependencies]
+document-graphics = "=0.1.0"
+```
 
 Handle the private worker argument before initializing the application:
 
 ```no_run
-use native_preview::{RasterOptions, worker::{self, Worker}};
+use document_graphics::{RasterOptions, worker::{self, Worker}};
 use std::{sync::atomic::AtomicBool, time::Duration};
 
 fn main() -> std::io::Result<()> {
@@ -68,11 +90,32 @@ idle. Neither policy is imposed on the other application.
 
 ## Development
 
-This package is maintained in the mdviewer workspace under `crates/native-preview`.
-It depends on the published `katex-native` and `mermaid-rs-renderer` crates. Shared
-renderer, SVG and protocol tests belong here; application policy tests stay with
-their consumers. Run `cargo test -p native-preview` from the workspace. On macOS,
-worker tests must run outside an enclosing sandbox so the child can install its
-own sandbox.
+This is a standalone library repository, shared by mdviewer and Plastext.
+Dependencies come from crates.io; no sibling checkout is required to build or
+test the library.
+
+```sh
+cargo fmt --all --check
+cargo clippy --all-targets --locked -- -D warnings
+cargo test --locked
+cargo +1.90.0 check --all-targets --locked
+```
+
+Shared renderer, SVG and protocol tests belong here. Application integration and
+policy tests stay with the consumers. On macOS, worker tests must run outside an
+enclosing sandbox so the child can install its own sandbox.
+
+For local development, add this entry to an untracked `.cargo/config.toml` in
+**each consumer**, adapting the relative path to the checkout layout:
+
+```toml
+[patch.crates-io]
+document-graphics = { path = "../document-graphics" }
+```
+
+Run Cargo from that consumer's root. Keep the library checkout outside its
+`target/` directory so cleaning build artifacts cannot remove source. Published
+consumers use a versioned registry dependency; local overrides are temporary.
+See [release checks](https://github.com/garlab/document-graphics/blob/main/docs/releasing.md) for packaging and consumer validation.
 
 MIT; see [LICENSE](LICENSE). `katex-native` includes KaTeX fonts under OFL-1.1.

@@ -350,6 +350,7 @@ impl Drop for Worker {
 mod tests {
     use super::*;
     use crate::MAX_EDGE;
+    #[cfg(unix)]
     use std::sync::Arc;
     #[test]
     fn worker_protocol_rejects_invalid_or_truncated_data_before_allocating() {

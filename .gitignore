@@ -1,0 +1,15 @@
+/target/
+.DS_Store
+__pycache__/
+*.bench-raw.json
+*.bench-raw.log
+
+# Local Cargo settings and registry credentials.
+/.cargo/config
+/.cargo/config.toml
+/.cargo/credentials
+/.cargo/credentials.toml
+
+.env
+.env.*
+!.env.example

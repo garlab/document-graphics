@@ -1,5 +1,5 @@
 //! Exercise the same isolated worker entry point as the app, without a window.
-use native_preview::{
+use document_graphics::{
     RasterOptions,
     worker::{self, Worker},
 };
@@ -57,7 +57,7 @@ fn main() {
                 .expect(name);
             let elapsed = start.elapsed().as_secs_f64() * 1000.;
             times.push(elapsed);
-            assert!(p.width as usize * p.height as usize <= native_preview::MAX_PIXELS);
+            assert!(p.width as usize * p.height as usize <= document_graphics::MAX_PIXELS);
             assert_eq!(p.rgba.len(), (p.width * p.height * 4) as usize);
             assert!(p.rgba.as_chunks::<4>().0.iter().any(|p| p[3] > 0));
             println!(
