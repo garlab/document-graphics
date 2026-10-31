@@ -1,6 +1,4 @@
 [workspace]
-members = ["crates/mermaid-renderer"]
-default-members = ["."]
 resolver = "3"
 
 [package]
@@ -15,7 +13,7 @@ documentation = "https://docs.rs/document-graphics"
 repository = "https://github.com/garlab/document-graphics"
 keywords = ["mermaid", "svg", "preview", "rendering"]
 categories = ["rendering", "text-processing"]
-include = ["src/**", "tests/**", "fonts/**", "patches/**", "README.md", "LICENSE", "Cargo.toml"]
+include = ["src/**", "tests/**", "fonts/**", "README.md", "LICENSE", "Cargo.toml"]
 
 [features]
 default = []
@@ -23,7 +21,7 @@ sgf = []
 
 [dependencies]
 katex-native = "0.1"
-mermaid-rs-renderer = { package = "document-graphics-mermaid", version = "=0.1.0", path = "crates/mermaid-renderer", default-features = false }
+mermaid-rs-renderer = { package = "document-graphics-mermaid", version = "=0.1.0", default-features = false }
 resvg = { version = "0.45.1", default-features = false, features = ["text"] }
 roxmltree = "0.20"
 

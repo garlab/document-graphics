@@ -147,9 +147,13 @@ idle. Neither policy is imposed on the other application.
 ## Development
 
 This is a standalone library repository, shared by mdviewer and Plastext.
-The Mermaid backend is a small fork kept in `crates/mermaid-renderer`; its
-[upstream delta](https://github.com/garlab/document-graphics/blob/main/patches/README.md) is isolated for review and eventual upstreaming.
-Other dependencies come from crates.io; no sibling checkout is required.
+The Mermaid backend comes from the published
+[`document-graphics-mermaid`](https://crates.io/crates/document-graphics-mermaid)
+crate, maintained in a [separate fork](https://github.com/garlab/mermaid-rs-renderer).
+It provides caller-supplied font metrics, complete ER key badges and chart-label
+contrast fixes. Its default features stay disabled: this library owns SVG
+rasterization and does not need the backend's CLI or PNG renderer.
+All dependencies come from crates.io; no sibling checkout is required.
 
 ```sh
 cargo fmt --all --check

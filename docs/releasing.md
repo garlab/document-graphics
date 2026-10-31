@@ -30,13 +30,14 @@ cargo fmt --all --check
 cargo clippy --all-targets --all-features --no-deps --locked -- -D warnings
 cargo test --all-features --locked
 cargo +1.90.0 check --all-targets --all-features --locked
-cargo package --workspace --list --locked
-cargo package --workspace --locked
+cargo package --list --locked
+cargo package --locked
 ```
 
-The workspace package command packages and verifies both crates without uploading. Use a clean checkout and
-review the archive's file list. Cargo.lock is tracked for reproducible repository
-checks; consumers resolve transitive dependencies using their own lockfiles.
+The package command packages and verifies this library against its published
+dependencies without uploading. Use a clean checkout without backend overrides
+and review the archive's file list. Cargo.lock is tracked for reproducible
+repository checks; consumers resolve transitive dependencies using their own lockfiles.
 The package includes library sources, tests, README, license and Cargo metadata.
 
 For renderer changes, check both consumers with
@@ -53,22 +54,60 @@ Compare image output and feature costs when behavior changes. Keep generated
 images and raw timing samples in ignored `target/` directories. A rename or
 repository move alone should preserve renderer output.
 
+### Backend 0.1.0 migration measurements
+
+The 2026-10-31 migration replaced the patched, vendored `mermaid-rs-renderer`
+0.3.1 with the published `document-graphics-mermaid` 0.1.0. Library tests
+(including SGF and the macOS worker sandbox), consumer integration tests,
+terminal checks, Clippy, Rust 1.90 and package verification passed.
+
+The 13-diagram terminal fixture retained its text, dimensions and placement at
+24 and 100 columns in both themes. Reviewed pixel changes were confined to
+arrowheads, the final-state symbol and timeline/journey text colors.
+
+Performance was measured with mdviewer's `bench/run.py`: release builds, one
+warm-up and three measured processes per case, a drained 100-column PTY with
+10 × 20-pixel cells, Apple M2 Pro / 16 GiB, macOS 26.4.1 and Rust 1.99.0.
+These times include startup and worker execution, but exclude emulator painting.
+Inputs and raw results remain outside the repositories. `mermaid-basic.md` used
+the current 13-diagram fixture; the other inputs came from `bench/generate.py`.
+
+| Input | Vendored backend | Registry backend |
+| --- | ---: | ---: |
+| 10 MiB mixed Markdown | 1,117.1 ms | 1,098.9 ms |
+| 100 repeated diagrams | 25.4 ms | 25.2 ms |
+| 40 unique diagrams (32 rendered within the budget) | 28.0 ms | 28.4 ms |
+| Dense flowchart (32 nodes, 60 edges) | 426.2 ms | 586.5 ms |
+| 13-diagram fixture | 66.8 ms | 70.8 ms |
+
+The dense-flowchart slowdown (about 38%) is an open backend performance issue;
+retain this case when evaluating renderer updates. A separate run with process
+sampling confirmed the slowdown. Its sampled combined CLI/worker peak RSS was
+13.4 → 13.5 MiB, while the 13-diagram fixture was 19.2 → 18.5 MiB. Sampling can
+miss short peaks, so these are observations rather than memory bounds. The
+mixed-document peak RSS was 58.0 → 58.1 MiB. The mdviewer release binary grew by
+212 KiB (15.79 → 16.00 MiB); enabled runtime dependencies did not increase.
+
 ## Publication
 
 The [release workflow](../.github/workflows/release.yml) publishes version tags
 through crates.io's Trusted Publishing; the repository stores no registry token.
 After review and consumer validation:
 
-The forked backend has its own package name. Publish its reviewed version before
-releasing a document-graphics version that depends on it (the first publication
-must be done manually before configuring Trusted Publishing for that crate):
+The Mermaid backend is maintained and published separately as
+[`document-graphics-mermaid`](https://crates.io/crates/document-graphics-mermaid).
+When changing it, follow the fork's
+[release guide](https://github.com/garlab/mermaid-rs-renderer/blob/fork-release/docs/release.md)
+and publish the reviewed backend version first. Pin that version in this
+library's `Cargo.toml`, keep `default-features = false`, and refresh `Cargo.lock`.
+Confirm the backend's registry source and checksum in the lockfile, then repeat
+the library and consumer checks above. Backend upgrades may change layout even
+when the adapter API is unchanged; review any changed fixture dimensions or
+rendered output and compare performance and memory use.
 
-```sh
-cargo publish -p document-graphics-mermaid --locked
-```
-
-Consumers need only the document-graphics override; the backend path is internal
-to this workspace. Then release document-graphics through the existing workflow:
+Consumers need only the document-graphics override for local integration tests;
+the backend resolves from crates.io. Release document-graphics through the
+existing workflow:
 
 1. Set the new version in `Cargo.toml`, run `cargo check` so `Cargo.lock` follows,
    commit, and push `main`.
