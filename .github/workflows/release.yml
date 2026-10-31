@@ -40,7 +40,7 @@ jobs:
             echo "::error::$TAG isn't on main: push main, then re-run this workflow"
             exit 1
           fi
-      - run: cargo test --locked
+      - run: cargo test --all-features --locked
       - run: cargo publish --dry-run --locked
 
   publish:

@@ -1,6 +1,8 @@
 #![doc = include_str!("../README.md")]
 
 pub mod mermaid;
+#[cfg(feature = "sgf")]
+pub mod sgf;
 pub mod svg;
 pub mod worker;
 

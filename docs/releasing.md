@@ -27,9 +27,9 @@ scheduling and cache policies with consumers. Preserve license notices.
 
 ```sh
 cargo fmt --all --check
-cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked
-cargo +1.90.0 check --all-targets --locked
+cargo clippy --all-targets --all-features --locked -- -D warnings
+cargo test --all-features --locked
+cargo +1.90.0 check --all-targets --all-features --locked
 cargo package --list --locked
 cargo publish --dry-run --locked
 ```

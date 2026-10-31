@@ -1,6 +1,6 @@
 [package]
 name = "document-graphics"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.90"
 description = "Render graphics from untrusted documents to RGBA, with resource limits and isolated workers."
@@ -11,6 +11,10 @@ repository = "https://github.com/garlab/document-graphics"
 keywords = ["mermaid", "svg", "preview", "rendering"]
 categories = ["rendering", "text-processing"]
 include = ["src/**", "tests/**", "README.md", "LICENSE", "Cargo.toml"]
+
+[features]
+default = []
+sgf = []
 
 [dependencies]
 katex-native = "0.1"

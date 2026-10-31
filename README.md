@@ -1,6 +1,6 @@
 # document-graphics
 
-Bounded native Mermaid and SVG rendering for terminal and GUI applications. The
+Bounded native Mermaid, SVG and optional SGF Go-board rendering for terminal and GUI applications. The
 crate returns straight RGBA pixels and logical dimensions. It has no UI framework,
 Markdown document model, application cache, broker or background service.
 
@@ -12,9 +12,10 @@ and rejects external resources, filters, reuse and foreign content.
 ## Scope
 
 The library renders the graphical content of documents independently of their
-layout or user interface. Today it supports Mermaid diagrams and a restricted
-SVG subset. Image decoding, other diagram formats, music notation and game-record
-diagrams are possible future modules; they are not implemented here yet.
+layout or user interface. Today it supports Mermaid diagrams, a restricted
+SVG subset and Go positions from SGF records (`sgf` feature). Image decoding,
+other diagram formats and music notation are possible future modules; they are
+not implemented here yet.
 Applications own document layout, interaction, scheduling and cache budgets.
 Equation layout remains in `katex-native`.
 
@@ -66,6 +67,55 @@ paths and does not fetch resources. Only the internal Mermaid route permits
 bounded arrow markers. Mermaid parsing and layout are private to the worker;
 there is no public in-process Mermaid entry point.
 
+## SGF Go records
+
+Enable the optional `sgf` feature (available from 0.1.1). It adds no dependencies,
+network access or runtime installation requirements. Parse a bounded collection,
+reconstruct the selected board, and render it off the application's UI thread:
+
+```rust
+# #[cfg(feature = "sgf")] {
+use document_graphics::{sgf::{Collection, RenderOptions, rasterize}, RasterOptions};
+use std::sync::{Arc, atomic::AtomicBool};
+let cancel = AtomicBool::new(false);
+let source: Arc<[u8]> = Arc::from(&b"(;FF[4]GM[1]SZ[9];B[dd];W[ee])"[..]);
+let collection = Collection::parse(source, &cancel)?;
+let position = collection.position(2, &cancel)?;
+let image = rasterize(&position, RenderOptions::default(), RasterOptions::scaled(2.), &cancel)?;
+# }
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The compact index retains source ranges and tree links, including unknown
+properties; it does not store a board or bitmap for every node. `Position::advance`
+replays a direct child incrementally. Applications choose which positions to cache.
+Captures, passes, setup stones, handicap, move numbers, common board marks,
+labels, arrows and lines are supported. Replay follows SGF positions without
+checking competitive legality, ko or turn order. Comments and game information
+are exposed as text for the caller's UI, not embedded in the diagram.
+
+Limits: 8 MiB source, 100,000 nodes, 1,024 games, 256 levels of variation nesting,
+300,000 properties (128 per node), 500,000 values, 128 KiB per value, boards up to
+52 × 52, 512 marks and 512 lines per position, and 32 characters per board label.
+Position reconstruction has a 20-million-step work limit. SVG and raster limits
+also apply, so dense annotated boards can exceed the diagram budget. UTF-8 and
+ISO-8859-1 are accepted; missing `CA` uses UTF-8 when valid, otherwise ISO-8859-1.
+Other games/encodings return an explicit error. `VW` cropping and legacy markup
+are retained in source but not interpreted. Board labels use bundled fonts.
+
+Unlike Mermaid's layout engine, this bounded, iterative parser and replay loop
+run in-process with cooperative cancellation, followed by the restricted SVG
+renderer. They are not isolated by the Mermaid worker's OS sandbox. Callers must
+schedule them off-thread, coalesce requests and retain readable source on failure.
+There is no hard wall-clock deadline on this in-process API.
+
+The repository's `sgf_probe` example reads an SGF directory, checks every node and
+renders roots and leaves without modifying any input:
+
+```sh
+cargo run --release --features sgf --example sgf_probe -- path/to/sgf-directory
+```
+
 ## Worker lifecycle
 
 Applications choose cache sizes, scheduling, idle retirement and total invocation
@@ -96,9 +146,9 @@ test the library.
 
 ```sh
 cargo fmt --all --check
-cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked
-cargo +1.90.0 check --all-targets --locked
+cargo clippy --all-targets --all-features --locked -- -D warnings
+cargo test --all-features --locked
+cargo +1.90.0 check --all-targets --all-features --locked
 ```
 
 Shared renderer, SVG and protocol tests belong here. Application integration and
