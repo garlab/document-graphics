@@ -4,10 +4,13 @@ Bounded native Mermaid, SVG and optional SGF Go-board rendering for terminal and
 crate returns straight RGBA pixels and logical dimensions. It has no UI framework,
 Markdown document model, application cache, broker or background service.
 
-Mermaid supports an ASCII subset: flowcharts, sequence, class and state diagrams,
-and ER relationships. Unsupported syntax returns `Ok(None)` through the worker;
-callers can retain the original source. SVG rendering uses bundled KaTeX fonts
-and rejects external resources, filters, reuse and foreign content.
+Mermaid supports flowcharts, sequence, class and state diagrams, ER attribute
+tables, pie charts, mind maps, timelines without sections, user journeys and
+quadrant charts. Bundled fonts cover Latin (including accents), Greek and
+Cyrillic labels. Unsupported syntax and unavailable glyphs return `Ok(None)`
+through the worker so callers can retain the original source. SVG rendering uses
+bundled KaTeX and Noto Sans fonts and rejects external resources, filters, reuse
+and foreign content.
 
 ## Scope
 
@@ -60,7 +63,10 @@ fn main() -> std::io::Result<()> {
 size. Applications can set both fields explicitly. Source and raster limits apply
 to every mode: 16 KiB / 256 lines of Mermaid, 128 nodes, 256 edges, 256 KiB SVG,
 one million output pixels, and an 8,192-pixel edge. Additional nesting, geometry,
-annotation and label limits are enforced before expensive work.
+annotation and label limits are enforced before expensive work. Pie charts allow
+64 slices, mind maps 128 nodes/depth 32, timelines 64 periods/128 events, journeys
+32 actors with scores 1–5, and quadrant charts 128 points with coordinates 0–1.
+Unsupported timeline sections retain source. Nonfinite chart numbers are rejected.
 
 Use `svg::rasterize(source, options)` for bounded local SVG. It accepts no file
 paths and does not fetch resources. Only the internal Mermaid route permits
@@ -141,12 +147,13 @@ idle. Neither policy is imposed on the other application.
 ## Development
 
 This is a standalone library repository, shared by mdviewer and Plastext.
-Dependencies come from crates.io; no sibling checkout is required to build or
-test the library.
+The Mermaid backend is a small fork kept in `crates/mermaid-renderer`; its
+[upstream delta](https://github.com/garlab/document-graphics/blob/main/patches/README.md) is isolated for review and eventual upstreaming.
+Other dependencies come from crates.io; no sibling checkout is required.
 
 ```sh
 cargo fmt --all --check
-cargo clippy --all-targets --all-features --locked -- -D warnings
+cargo clippy --all-targets --all-features --no-deps --locked -- -D warnings
 cargo test --all-features --locked
 cargo +1.90.0 check --all-targets --all-features --locked
 ```
@@ -159,4 +166,5 @@ See [release checks](https://github.com/garlab/document-graphics/blob/main/docs/
 for testing changes in the consumers, packaging and consumer validation.
 
 MIT; see [LICENSE](https://github.com/garlab/document-graphics/blob/main/LICENSE).
-`katex-native` includes KaTeX fonts under OFL-1.1.
+`katex-native` includes KaTeX fonts under OFL-1.1. Noto Sans assets and their
+license/provenance are in [fonts](https://github.com/garlab/document-graphics/blob/main/fonts/README.md).

@@ -31,6 +31,52 @@ pub fn validate(source: &str) -> Result<(), Error> {
     svg_preflight_inner(source, false).map(|_| ())
 }
 
+// Reuse the same embedded faces for SVG shaping and Mermaid measurement.
+pub(crate) fn fonts(extended: bool) -> &'static Arc<usvg::fontdb::Database> {
+    let base = FONTS.get_or_init(|| {
+        let mut database = usvg::fontdb::Database::new();
+        for font in katex_native::FONTS.iter().filter(|font| {
+            matches!(
+                font.font.family,
+                katex_native::Family::Main
+                    | katex_native::Family::SansSerif
+                    | katex_native::Family::Typewriter
+            )
+        }) {
+            let ids = database.load_font_source(usvg::fontdb::Source::Binary(Arc::new(font.data)));
+            for id in ids {
+                if let Some(mut face) = database.face(id).cloned() {
+                    face.style = if font.font.italic {
+                        usvg::fontdb::Style::Italic
+                    } else {
+                        usvg::fontdb::Style::Normal
+                    };
+                    database.remove_face(id);
+                    database.push_face_info(face);
+                }
+            }
+        }
+        database.set_serif_family("KaTeX_Main");
+        database.set_sans_serif_family("KaTeX_SansSerif");
+        database.set_monospace_family("KaTeX_Typewriter");
+        Arc::new(database)
+    });
+    if !extended {
+        return base;
+    }
+    static EXTENDED: OnceLock<Arc<usvg::fontdb::Database>> = OnceLock::new();
+    EXTENDED.get_or_init(|| {
+        let mut database = (**base).clone();
+        for bytes in [
+            include_bytes!("../fonts/NotoSans-Regular.ttf").as_slice(),
+            include_bytes!("../fonts/NotoSans-Bold.ttf").as_slice(),
+        ] {
+            database.load_font_source(usvg::fontdb::Source::Binary(Arc::new(bytes)));
+        }
+        Arc::new(database)
+    })
+}
+
 /// Rasterize local SVG using bounded geometry and bundled text fonts. Images,
 /// filters, reuse and markers are unsupported; missing glyphs return an error.
 pub fn rasterize(source: &str, options: RasterOptions) -> Result<Raster, Error> {
@@ -43,7 +89,7 @@ fn rasterize_inner(source: &str, fitting: RasterOptions, markers: bool) -> Resul
     if !fitting.valid() {
         return Err(Error::Limit);
     }
-    let has_text = svg_preflight_inner(source, markers)?;
+    let (has_text, extended_fonts) = svg_preflight_inner(source, markers)?;
     let missing_font = Arc::new(AtomicBool::new(false));
     let mut options = usvg::Options {
         image_href_resolver: usvg::ImageHrefResolver {
@@ -54,37 +100,7 @@ fn rasterize_inner(source: &str, fitting: RasterOptions, markers: bool) -> Resul
         ..Default::default()
     };
     if has_text {
-        options.fontdb = FONTS
-            .get_or_init(|| {
-                let mut database = usvg::fontdb::Database::new();
-                for font in katex_native::FONTS.iter().filter(|font| {
-                    matches!(
-                        font.font.family,
-                        katex_native::Family::Main
-                            | katex_native::Family::SansSerif
-                            | katex_native::Family::Typewriter
-                    )
-                }) {
-                    let ids = database
-                        .load_font_source(usvg::fontdb::Source::Binary(Arc::new(font.data)));
-                    for id in ids {
-                        if let Some(mut face) = database.face(id).cloned() {
-                            face.style = if font.font.italic {
-                                usvg::fontdb::Style::Italic
-                            } else {
-                                usvg::fontdb::Style::Normal
-                            };
-                            database.remove_face(id);
-                            database.push_face_info(face);
-                        }
-                    }
-                }
-                database.set_serif_family("KaTeX_Main");
-                database.set_sans_serif_family("KaTeX_SansSerif");
-                database.set_monospace_family("KaTeX_Typewriter");
-                Arc::new(database)
-            })
-            .clone();
+        options.fontdb = fonts(extended_fonts).clone();
         let select = usvg::FontResolver::default_font_selector();
         let missing = missing_font.clone();
         options.font_resolver.select_font = Box::new(move |font, database| {
@@ -154,7 +170,7 @@ fn rasterize_inner(source: &str, fitting: RasterOptions, markers: bool) -> Resul
         rgba,
     })
 }
-fn svg_preflight_inner(source: &str, markers: bool) -> Result<bool, Error> {
+fn svg_preflight_inner(source: &str, markers: bool) -> Result<(bool, bool), Error> {
     if source.len() > MAX_SOURCE {
         return Err(Error::Limit);
     }
@@ -169,13 +185,16 @@ fn svg_preflight_inner(source: &str, markers: bool) -> Result<bool, Error> {
     if document.root_element().tag_name().name() != "svg" {
         return Err(Error::Invalid);
     }
+    let mut extended_fonts = false;
     let (mut geometry, mut text_bytes, mut has_text, mut marker_count) = (0, 0, false, 0);
     for node in document.descendants() {
         if node.ancestors().take(34).count() > 33 {
             return Err(Error::Limit);
         }
         if node.is_text() {
-            text_bytes += node.text().unwrap_or_default().len();
+            let text = node.text().unwrap_or_default();
+            text_bytes += text.len();
+            extended_fonts |= !text.is_ascii();
         }
         if text_bytes > 32 * 1024 {
             return Err(Error::Limit);
@@ -227,6 +246,7 @@ fn svg_preflight_inner(source: &str, markers: bool) -> Result<bool, Error> {
             local_css(node.text().unwrap_or_default())?;
         }
         for attr in node.attributes() {
+            extended_fonts |= attr.name() == "font-family" && attr.value().contains("Noto Sans");
             if matches!(attr.name(), "d" | "points") {
                 geometry += attr.value().len();
             }
@@ -239,7 +259,7 @@ fn svg_preflight_inner(source: &str, markers: bool) -> Result<bool, Error> {
             return Err(Error::Limit);
         }
     }
-    Ok(has_text)
+    Ok((has_text, extended_fonts))
 }
 
 fn local_css(value: &str) -> Result<(), Error> {
@@ -267,6 +287,24 @@ mod tests {
     fn rasterize(source: &str) -> Result<Raster, Error> {
         super::diagram(source, RasterOptions::scaled(2.))
     }
+    #[test]
+    fn unicode_text_and_numeric_entities_use_the_same_embedded_glyphs() {
+        let source = "<svg xmlns='http://www.w3.org/2000/svg' width='180' height='35'><text x='2' y='24' font-size='20'>Café Ελληνικά</text></svg>";
+        let literal = rasterize(source).unwrap();
+        let entities = source
+            .chars()
+            .map(|c| {
+                if c.is_ascii() {
+                    c.to_string()
+                } else {
+                    format!("&#{};", c as u32)
+                }
+            })
+            .collect::<String>();
+        assert_eq!(literal.rgba, rasterize(&entities).unwrap().rgba);
+        assert_eq!(fonts(true).len(), fonts(false).len() + 2);
+    }
+
     #[test]
     fn caller_fitting_is_bounded_and_local_svg_cannot_enable_diagram_markers() {
         let shape = "<svg xmlns='http://www.w3.org/2000/svg' width='200' height='100'><rect width='200' height='100' fill='red' opacity='0.5'/></svg>";

@@ -1,0 +1,33 @@
+[package]
+name = "document-graphics-mermaid"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+description = "Mermaid backend with embedded-font metrics for document-graphics"
+license = "MIT"
+repository = "https://github.com/garlab/document-graphics"
+readme = "README.md"
+include = ["src/**", "LICENSE", "README.md", "Cargo.toml"]
+autobins = false
+
+[lib]
+name = "mermaid_rs_renderer"
+
+[features]
+default = []
+cli = ["dep:clap"]
+png = ["dep:resvg", "dep:usvg"]
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.6.1", features = ["derive"], optional = true }
+regex = "1.12"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+json5 = "1.3"
+thiserror = "2.0"
+once_cell = "1.21.4"
+fontdb = "0.23"
+ttf-parser = "0.25"
+resvg = { version = "0.47.0", optional = true }
+usvg = { version = "0.47.0", optional = true }

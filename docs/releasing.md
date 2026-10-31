@@ -27,14 +27,14 @@ scheduling and cache policies with consumers. Preserve license notices.
 
 ```sh
 cargo fmt --all --check
-cargo clippy --all-targets --all-features --locked -- -D warnings
+cargo clippy --all-targets --all-features --no-deps --locked -- -D warnings
 cargo test --all-features --locked
 cargo +1.90.0 check --all-targets --all-features --locked
-cargo package --list --locked
-cargo publish --dry-run --locked
+cargo package --workspace --list --locked
+cargo package --workspace --locked
 ```
 
-The dry run packages and verifies without uploading. Use a clean checkout and
+The workspace package command packages and verifies both crates without uploading. Use a clean checkout and
 review the archive's file list. Cargo.lock is tracked for reproducible repository
 checks; consumers resolve transitive dependencies using their own lockfiles.
 The package includes library sources, tests, README, license and Cargo metadata.
@@ -58,6 +58,17 @@ repository move alone should preserve renderer output.
 The [release workflow](../.github/workflows/release.yml) publishes version tags
 through crates.io's Trusted Publishing; the repository stores no registry token.
 After review and consumer validation:
+
+The forked backend has its own package name. Publish its reviewed version before
+releasing a document-graphics version that depends on it (the first publication
+must be done manually before configuring Trusted Publishing for that crate):
+
+```sh
+cargo publish -p document-graphics-mermaid --locked
+```
+
+Consumers need only the document-graphics override; the backend path is internal
+to this workspace. Then release document-graphics through the existing workflow:
 
 1. Set the new version in `Cargo.toml`, run `cargo check` so `Cargo.lock` follows,
    commit, and push `main`.

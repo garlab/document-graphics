@@ -31,7 +31,7 @@ jobs:
           toolchain: stable
       - name: Check that the tag matches Cargo.toml and is on main
         run: |
-          version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')
+          version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "document-graphics") | .version')
           if [ "$TAG" != "v$version" ]; then
             echo "::error::$TAG doesn't match version $version in Cargo.toml"
             exit 1
@@ -41,7 +41,7 @@ jobs:
             exit 1
           fi
       - run: cargo test --all-features --locked
-      - run: cargo publish --dry-run --locked
+      - run: cargo publish -p document-graphics --dry-run --locked
 
   publish:
     needs: verify
@@ -70,5 +70,5 @@ jobs:
             "https://crates.io/api/v1/crates/document-graphics/${TAG#v}"; then
             echo "document-graphics ${TAG#v} is on crates.io already"
           else
-            cargo publish --locked --no-verify
+            cargo publish -p document-graphics --locked --no-verify
           fi

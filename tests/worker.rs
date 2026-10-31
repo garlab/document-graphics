@@ -24,36 +24,71 @@ fn main() {
         (
             "flowchart",
             "flowchart LR\n A[Read Markdown] --> B{Diagram?}\n B -->|Yes| C[Preview]\n B -->|No| D[Text]\n C --> E[Read]\n D --> E\n",
-            (705, 181),
+            Some((705, 181)),
         ),
         (
             "sequence",
             "sequenceDiagram\n participant R as Reader\n participant V as Viewer\n R->>V: Open file\n activate V\n V-->>R: Rendered preview\n deactivate V\n",
-            (450, 287),
+            Some((450, 287)),
         ),
         (
             "class",
             "classDiagram\n class Document {\n +String source\n +render()\n }\n Document --> Renderer\n",
-            (201, 304),
+            Some((201, 304)),
         ),
         (
             "state",
             "stateDiagram-v2\n [*] --> Reading\n Reading --> Rendering: diagram\n Rendering --> Reading: next block\n Reading --> [*]\n",
-            (214, 198),
+            Some((214, 198)),
         ),
         (
             "er",
             "erDiagram\n DOCUMENT ||--o{ BLOCK : contains\n",
-            (196, 197),
+            Some((196, 197)),
         ),
         (
             "subgraph",
             "flowchart LR\n subgraph Input\n A[File] --> B[Parser]\n end\n subgraph Output\n C[Diagram] --> D[Preview]\n end\n B --> C\n",
-            (779, 147),
+            Some((779, 147)),
+        ),
+        (
+            "unicode",
+            "flowchart LR\n A[Café déjà vu] --> B[Ελληνικά Русский]",
+            Some((445, 78)),
+        ),
+        (
+            "attributes",
+            "erDiagram\n BOOK {\n int identifier PK,FK,UK\n varchar title \"display name\"\n decimal price\n }\n BOOK ||--o{ PAGE : contains\n PAGE {\n int identifier PK\n int book_id FK\n }",
+            Some((411, 373)),
+        ),
+        (
+            "pie",
+            "pie showData\n title Café\n \"Thé\": 3\n \"Café\": 7",
+            Some((454, 360)),
+        ),
+        (
+            "mindmap",
+            "mindmap\n root((Reading))\n   Notes\n     Ideas\n   Diagrams",
+            Some((543, 103)),
+        ),
+        (
+            "timeline",
+            "timeline\n title History\n 2020 : Launch : Learn\n 2021 : Grow",
+            Some((340, 280)),
+        ),
+        (
+            "journey",
+            "journey\n title Reading\n section Start\n Open file: 5: Reader\n Read: 4: Reader, Editor",
+            Some((309, 247)),
+        ),
+        (
+            "quadrant",
+            "quadrantChart\n title Work\n x-axis Low effort --> High effort\n y-axis Low value --> High value\n Task A: [0.2, 0.8]\n Task B: [0.8, 0.3]",
+            Some((552, 511)),
         ),
     ];
     let mut times = Vec::new();
-    for (name, source, (width, height)) in cases {
+    for (name, source, expected) in cases {
         for light in [false, true] {
             let start = Instant::now();
             let p = worker
@@ -68,13 +103,17 @@ fn main() {
                 .expect(name);
             let elapsed = start.elapsed().as_secs_f64() * 1000.;
             times.push(elapsed);
-            assert_eq!(
-                (p.original_width, p.original_height),
-                (width, height),
-                "{name}, light={light}: logical size"
-            );
-            // Every fixture fits the pixel cap at 2x, so none is scaled down.
-            assert_eq!((p.width, p.height), (2 * width, 2 * height), "{name}");
+            if let Some((width, height)) = expected {
+                assert_eq!(
+                    (p.original_width, p.original_height),
+                    (width, height),
+                    "{name}"
+                );
+                if u64::from(width) * u64::from(height) * 4 <= document_graphics::MAX_PIXELS as u64
+                {
+                    assert_eq!((p.width, p.height), (2 * width, 2 * height), "{name}");
+                }
+            }
             assert!(p.width as usize * p.height as usize <= document_graphics::MAX_PIXELS);
             assert_eq!(p.rgba.len(), (p.width * p.height * 4) as usize);
             assert!(p.rgba.as_chunks::<4>().0.iter().any(|p| p[3] > 0));
@@ -90,7 +129,7 @@ fn main() {
     assert!(
         worker
             .render(
-                "pie\n\"A\":1\n",
+                "gantt\nTask: 2025-01-01, 1d\n",
                 false,
                 RasterOptions::fit((500, 300)),
                 std::time::Duration::from_secs(2),
@@ -102,7 +141,7 @@ fn main() {
     assert!(
         worker
             .render(
-                "erDiagram\n BOOK {\n string title\n }\n",
+                "flowchart LR\n A[中文]-->B\n",
                 false,
                 RasterOptions::fit((500, 300)),
                 std::time::Duration::from_secs(2),
