@@ -33,7 +33,7 @@ Requires Rust 1.90 or newer.
 
 ```toml
 [dependencies]
-document-graphics = "0.1"
+document-graphics = "0.1.2"
 ```
 
 Handle the private worker argument before initializing the application:
@@ -77,10 +77,9 @@ paths and does not fetch resources. Only the internal Mermaid route permits
 bounded arrow markers. Mermaid parsing and layout are private to the worker;
 there is no public in-process Mermaid entry point.
 
-The expanded Mermaid limits above are unreleased. Large graphs also need the
-routing-policy fix in the backend checkout; published 0.1.1 has the previous
-128-node / 256-edge limits. See the [release guide](https://github.com/garlab/document-graphics/blob/main/docs/releasing.md)
-for local validation and publication order.
+The expanded Mermaid limits are available from 0.1.2, using the published
+`document-graphics-mermaid` 0.1.2 backend. They retain the existing worker memory
+and raster budgets.
 
 ## SGF Go records
 
@@ -159,9 +158,10 @@ This is a standalone library repository, shared by mdviewer and Plastext.
 The Mermaid backend comes from the published
 [`document-graphics-mermaid`](https://crates.io/crates/document-graphics-mermaid)
 crate, maintained in a [separate fork](https://github.com/garlab/mermaid-rs-renderer).
-It provides caller-supplied font metrics, complete ER key badges and chart-label
-contrast fixes. Its default features stay disabled: this library owns SVG
-rasterization and does not need the backend's CLI or PNG renderer.
+It provides caller-supplied font metrics, complete ER key badges, chart-label
+contrast fixes and bounded routing policies for large flowcharts. Its default
+features stay disabled: this library owns SVG rasterization and does not need
+the backend's CLI or PNG renderer.
 All dependencies come from crates.io; no sibling checkout is required.
 
 ```sh

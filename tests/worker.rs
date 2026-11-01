@@ -195,7 +195,7 @@ fn main() {
 }
 
 // Opt-in because this exercises an interactive deadline, not just correctness.
-// Run in an optimized profile with the unreleased routing-policy fix.
+// Run in an optimized profile; see docs/releasing.md for the command.
 fn large_flowchart() {
     let mut source = String::from("flowchart TD\nN0 --> N1\n");
     for n in 1..256 {

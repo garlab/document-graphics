@@ -19,21 +19,11 @@ Run Cargo from that consumer's root. Keep the library checkout outside its
 `target/` directory so cleaning build artifacts cannot remove source. Published
 consumers use a versioned registry dependency; local overrides are temporary.
 
-## Unreleased large-flowchart support
+## Large-flowchart validation
 
-The expanded Mermaid limits need the main-route performance-policy fix in the
-backend. Test both sibling checkouts without modifying lockfiles by adding this
-top-level entry to an ignored `.cargo/config.toml` in this repository:
-
-```toml
-paths = ["../mermaid-rs-renderer"]
-```
-
-This works while versions and dependency graphs match the published packages.
-Publish the reviewed backend first, update this library's exact backend pin,
-then release this library and update consumers. Remove overrides and repeat
-release checks against the registry at each step. No new version is pinned
-before it is published.
+Version 0.1.2 pins the published `document-graphics-mermaid` 0.1.2 backend.
+It expands Mermaid input and generated-SVG limits while preserving the worker
+memory guard and output pixel cap. Run these checks without backend overrides.
 
 The opt-in worker regression constructs a styled 384-node / 383-edge tree and
 renders it from a fresh worker in each theme within two seconds:

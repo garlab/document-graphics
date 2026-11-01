@@ -154,7 +154,7 @@ checksum = "be1e0bca6c3637f992fc1cc7cbc52a78c1ef6db076dbf1059c4323d6a2048376"
 
 [[package]]
 name = "document-graphics"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "document-graphics-mermaid",
  "katex-native",
@@ -165,9 +165,9 @@ dependencies = [
 
 [[package]]
 name = "document-graphics-mermaid"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c330bdb4833d8fa8d375e5c3f9ea69aa40aec1a6178b609fe467a365aa2a6a2a"
+checksum = "cb30a45e06b406e07faf96fe14d34f9f863c4a1a484f211a80a13b3cfb421b20"
 dependencies = [
  "anyhow",
  "fontdb",
