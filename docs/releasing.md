@@ -80,13 +80,45 @@ the current 13-diagram fixture; the other inputs came from `bench/generate.py`.
 | Dense flowchart (32 nodes, 60 edges) | 426.2 ms | 586.5 ms |
 | 13-diagram fixture | 66.8 ms | 70.8 ms |
 
-The dense-flowchart slowdown (about 38%) is an open backend performance issue;
-retain this case when evaluating renderer updates. A separate run with process
-sampling confirmed the slowdown. Its sampled combined CLI/worker peak RSS was
+The dense-flowchart slowdown (about 38%) was recorded with backend 0.1.0;
+the 0.1.1 follow-up below recovers it. Retain this case when evaluating renderer
+updates. A separate run with process sampling confirmed the slowdown. Its sampled
+combined CLI/worker peak RSS was
 13.4 → 13.5 MiB, while the 13-diagram fixture was 19.2 → 18.5 MiB. Sampling can
 miss short peaks, so these are observations rather than memory bounds. The
 mixed-document peak RSS was 58.0 → 58.1 MiB. The mdviewer release binary grew by
 212 KiB (15.79 → 16.00 MiB); enabled runtime dependencies did not increase.
+
+### Backend 0.1.1 performance check
+
+The 2026-11-01 update pins the published backend 0.1.1. Its routing optimization
+reuses shape polygons and skips intersection sampling for disjoint segments.
+Both lockfiles changed only the backend version and checksum from the preceding
+local integration state; mdviewer still used its local document-graphics override.
+
+The same machine, release profile, corpora and PTY methodology above gave these
+medians, with one warm-up and three fresh measured processes per case. Both
+backend versions came from crates.io; builds and tests finished before timing.
+
+| Input | Backend 0.1.0 | Backend 0.1.1 |
+| --- | ---: | ---: |
+| 10 MiB mixed Markdown | 1,097.4 ms | 1,078.2 ms |
+| 100 repeated diagrams | 23.9 ms | 24.5 ms |
+| 40 unique diagrams (32 rendered within the budget) | 28.2 ms | 27.5 ms |
+| Dense flowchart (32 nodes, 60 edges) | 593.9 ms | 410.3 ms |
+| 13-diagram fixture | 69.1 ms | 46.1 ms |
+
+The dense case improves by about 31%, and the 13-diagram fixture by about 33%.
+The mixed-document process peak RSS was 58.20 → 58.17 MiB, and the dense case
+12.36 → 12.02 MiB. These are `wait4` process statistics, not concurrent
+CLI/worker totals. The release binary remained about 16.00 MiB (16 bytes smaller).
+Inputs and raw results remain outside the repositories; earlier baselines are
+unchanged.
+
+All 13 diagrams retained byte-identical terminal output at 24 and 100 columns in
+both themes, including pixels and placement. Library and mdviewer Rust tests,
+26 shared-worker fixture renders, all 43 terminal checks, formatting, Clippy and
+Rust 1.90 checks passed. Timing excludes emulator painting.
 
 ## Publication
 
