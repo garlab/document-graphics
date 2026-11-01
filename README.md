@@ -60,10 +60,14 @@ fn main() -> std::io::Result<()> {
 
 `RasterOptions::fit((width, height))` fits within physical bounds without upscaling.
 `RasterOptions::scaled(2.)` requests Retina output while preserving logical SVG
-size. Applications can set both fields explicitly. Source and raster limits apply
-to every mode: 16 KiB / 256 lines of Mermaid, 128 nodes, 256 edges, 256 KiB SVG,
-one million output pixels, and an 8,192-pixel edge. Additional nesting, geometry,
-annotation and label limits are enforced before expensive work. Pie charts allow
+size. Applications can set both fields explicitly. Mermaid input is limited to
+16 KiB / 1,024 lines, 512 nodes and 1,024 edges. Its generated SVG is limited to
+1 MiB, 16,384 XML nodes, 256 KiB of geometry, a 32,768-unit logical edge and
+64 million logical square units. These logical dimensions do not allocate a
+full-size bitmap: output remains capped at one million pixels and an
+8,192-pixel edge. Local SVG retains its 256 KiB source, 4,096 XML nodes,
+64 KiB of geometry, 8,192-unit logical edge and four-million-unit area limits.
+Additional nesting, annotation and label limits apply before expensive work. Pie charts allow
 64 slices, mind maps 128 nodes/depth 32, timelines 64 periods/128 events, journeys
 32 actors with scores 1–5, and quadrant charts 128 points with coordinates 0–1.
 Unsupported timeline sections retain source. Nonfinite chart numbers are rejected.
@@ -72,6 +76,11 @@ Use `svg::rasterize(source, options)` for bounded local SVG. It accepts no file
 paths and does not fetch resources. Only the internal Mermaid route permits
 bounded arrow markers. Mermaid parsing and layout are private to the worker;
 there is no public in-process Mermaid entry point.
+
+The expanded Mermaid limits above are unreleased. Large graphs also need the
+routing-policy fix in the backend checkout; published 0.1.1 has the previous
+128-node / 256-edge limits. See the [release guide](https://github.com/garlab/document-graphics/blob/main/docs/releasing.md)
+for local validation and publication order.
 
 ## SGF Go records
 

@@ -7,6 +7,11 @@ use std::sync::{
 };
 /// Maximum encoded SVG source size, before parsing or font loading.
 pub const MAX_SOURCE: usize = 256 * 1024;
+// Generated diagrams may have a larger logical canvas, but their allocated
+// raster still obeys MAX_PIXELS / MAX_EDGE. Local SVG keeps its existing caps.
+pub(crate) const MAX_DIAGRAM_SOURCE: usize = 1024 * 1024;
+pub(crate) const MAX_DIAGRAM_EDGE: u32 = 32_768;
+pub(crate) const MAX_DIAGRAM_AREA: u64 = 64_000_000;
 static FONTS: OnceLock<Arc<usvg::fontdb::Database>> = OnceLock::new();
 #[derive(Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -126,11 +131,16 @@ fn rasterize_inner(source: &str, fitting: RasterOptions, markers: bool) -> Resul
     }
     let size = tree.size();
     let original = (size.width().ceil() as u32, size.height().ceil() as u32);
+    let (max_edge, max_area) = if markers {
+        (MAX_DIAGRAM_EDGE, MAX_DIAGRAM_AREA)
+    } else {
+        (8192, 4_000_000)
+    };
     if original.0 == 0
         || original.1 == 0
-        || original.0 > 8192
-        || original.1 > 8192
-        || u64::from(original.0) * u64::from(original.1) > 4_000_000
+        || original.0 > max_edge
+        || original.1 > max_edge
+        || u64::from(original.0) * u64::from(original.1) > max_area
     {
         return Err(Error::Limit);
     }
@@ -171,14 +181,19 @@ fn rasterize_inner(source: &str, fitting: RasterOptions, markers: bool) -> Resul
     })
 }
 fn svg_preflight_inner(source: &str, markers: bool) -> Result<(bool, bool), Error> {
-    if source.len() > MAX_SOURCE {
+    let source_limit = if markers {
+        MAX_DIAGRAM_SOURCE
+    } else {
+        MAX_SOURCE
+    };
+    if source.len() > source_limit {
         return Err(Error::Limit);
     }
     let document = roxmltree::Document::parse_with_options(
         source,
         roxmltree::ParsingOptions {
             allow_dtd: false,
-            nodes_limit: 4096,
+            nodes_limit: if markers { 16_384 } else { 4096 },
         },
     )
     .map_err(|_| Error::Invalid)?;
@@ -255,7 +270,7 @@ fn svg_preflight_inner(source: &str, markers: bool) -> Result<(bool, bool), Erro
             }
             local_css(attr.value())?;
         }
-        if geometry > 64 * 1024 {
+        if geometry > if markers { 256 * 1024 } else { 64 * 1024 } {
             return Err(Error::Limit);
         }
     }
@@ -366,7 +381,9 @@ mod tests {
             );
             assert!(rasterize(&source).is_err(), "Accepted: {body}");
         }
-        assert!(svg_preflight_inner(&format!("<svg>{}</svg>", "<g/>".repeat(5000)), true).is_err());
+        assert!(
+            svg_preflight_inner(&format!("<svg>{}</svg>", "<g/>".repeat(16_385)), true).is_err()
+        );
         assert!(
             svg_preflight_inner(
                 &format!("<svg>{}{}</svg>", "<g>".repeat(40), "</g>".repeat(40)),
@@ -376,14 +393,42 @@ mod tests {
         );
     }
     #[test]
+    fn generated_svg_limits_do_not_relax_local_svg_limits() {
+        let many_nodes = format!("<svg>{}</svg>", "<g/>".repeat(5000));
+        assert!(svg_preflight_inner(&many_nodes, true).is_ok());
+        assert!(svg_preflight_inner(&many_nodes, false).is_err());
+        let larger_source = format!("<svg><!--{}--></svg>", "x".repeat(MAX_SOURCE));
+        assert!(svg_preflight_inner(&larger_source, true).is_ok());
+        assert_eq!(
+            svg_preflight_inner(&larger_source, false),
+            Err(Error::Limit)
+        );
+        let excessive_source = format!("<svg><!--{}--></svg>", "x".repeat(MAX_DIAGRAM_SOURCE));
+        assert_eq!(
+            svg_preflight_inner(&excessive_source, true),
+            Err(Error::Limit)
+        );
+    }
+
+    #[test]
     fn pixel_cap_preserves_logical_dimensions() {
         let p = rasterize("<svg xmlns='http://www.w3.org/2000/svg' width='2000' height='1000'><rect width='2000' height='1000' fill='red'/></svg>").unwrap();
         assert_eq!((p.original_width, p.original_height), (2000, 1000));
         assert!(p.width * p.height <= crate::MAX_PIXELS as u32);
         assert!(p.width < p.original_width);
-        assert!(
-            rasterize("<svg xmlns='http://www.w3.org/2000/svg' width='9000' height='1000'/>")
-                .is_err()
-        );
+        let large = "<svg xmlns='http://www.w3.org/2000/svg' width='10000' height='1500'><rect width='10000' height='1500' fill='red'/></svg>";
+        let p = rasterize(large).unwrap();
+        assert_eq!((p.original_width, p.original_height), (10000, 1500));
+        assert!(p.width as usize * p.height as usize <= crate::MAX_PIXELS);
+        assert!(matches!(
+            super::rasterize(large, RasterOptions::scaled(2.)),
+            Err(Error::Limit)
+        ));
+        for (width, height) in [(MAX_DIAGRAM_EDGE + 1, 1), (32000, 32000)] {
+            let source = format!(
+                "<svg xmlns='http://www.w3.org/2000/svg' width='{width}' height='{height}'/>"
+            );
+            assert!(matches!(rasterize(&source), Err(Error::Limit)));
+        }
     }
 }

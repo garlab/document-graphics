@@ -2,13 +2,16 @@
 
 use crate::{Raster, RasterOptions, svg};
 pub const MAX_SOURCE: usize = 16 * 1024;
+pub const MAX_LINES: usize = 1024;
+pub const MAX_NODES: usize = 512;
+pub const MAX_EDGES: usize = 1024;
 
 /// Reject excessive input and configuration before starting a helper or parser.
 pub fn admissible(source: &str) -> bool {
     if source.is_empty()
         || source.len() > MAX_SOURCE
-        || source.lines().count() > 256
-        || source.bytes().filter(|b| *b == b';').count() > 256
+        || source.lines().count() > MAX_LINES
+        || source.bytes().filter(|b| *b == b';').count() > MAX_EDGES
         || source.bytes().filter(|b| *b == b'&').count() > 64
         || source.contains("%%{")
         || source.trim_start().starts_with("---")
@@ -99,8 +102,8 @@ fn diagram_svg(source: &str, light: bool) -> Option<String> {
                 | DiagramKind::Journey
                 | DiagramKind::Quadrant
         )
-        || graph.nodes.len() > 128
-        || graph.edges.len() > 256
+        || graph.nodes.len() > MAX_NODES
+        || graph.edges.len() > MAX_EDGES
         || graph.subgraphs.len() > 16
         || graph.subgraphs.iter().map(|g| g.nodes.len()).sum::<usize>() > 512
         || graph.sequence_participants.len() > 32
@@ -411,15 +414,28 @@ mod tests {
             "flowchart LR\n{}",
             "A".repeat(MAX_SOURCE)
         )));
-        assert!(!admissible(&format!("flowchart LR\n{}", "A;".repeat(257))));
+        assert!(!admissible(&format!(
+            "flowchart LR\n{}",
+            "A;".repeat(MAX_EDGES + 1)
+        )));
         assert!(!admissible(&format!(
             "flowchart LR\nA{}B{}",
             "[".repeat(33),
             "]".repeat(33)
         )));
+        let at_limit = format!("flowchart LR\n{}", "%% comment\n".repeat(MAX_LINES - 1));
+        assert!(admissible(&at_limit));
+        assert!(!admissible(&(at_limit + "%% one too many\n")));
+        let too_many_edges = format!("flowchart LR; {}", "A-->B;".repeat(MAX_EDGES + 1));
+        assert!(!admissible(&too_many_edges));
+        // Newlines and semicolons are optional between chained edges. The parsed
+        // graph must enforce the edge budget too, before attempting layout.
+        let compact = format!("flowchart LR; A{}", "-->A".repeat(MAX_EDGES + 1));
+        assert!(admissible(&compact));
+        assert!(render(&compact, false).is_none());
         let large = format!(
             "flowchart LR\n{}",
-            (0..129)
+            (0..=MAX_NODES)
                 .map(|i| format!("N{i}[Node {i}]\n"))
                 .collect::<String>()
         );

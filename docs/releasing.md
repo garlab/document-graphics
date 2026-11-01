@@ -19,6 +19,36 @@ Run Cargo from that consumer's root. Keep the library checkout outside its
 `target/` directory so cleaning build artifacts cannot remove source. Published
 consumers use a versioned registry dependency; local overrides are temporary.
 
+## Unreleased large-flowchart support
+
+The expanded Mermaid limits need the main-route performance-policy fix in the
+backend. Test both sibling checkouts without modifying lockfiles by adding this
+top-level entry to an ignored `.cargo/config.toml` in this repository:
+
+```toml
+paths = ["../mermaid-rs-renderer"]
+```
+
+This works while versions and dependency graphs match the published packages.
+Publish the reviewed backend first, update this library's exact backend pin,
+then release this library and update consumers. Remove overrides and repeat
+release checks against the registry at each step. No new version is pinned
+before it is published.
+
+The opt-in worker regression constructs a styled 384-node / 383-edge tree and
+renders it from a fresh worker in each theme within two seconds:
+
+```sh
+cargo test --locked --all-features --test worker --config profile.test.opt-level=1 -- --large
+```
+
+On Apple M2 Pro / 16 GiB, the 2026-11-01 run took 1.14–1.17 seconds including
+worker startup, layout, SVG parsing and rasterization. The 10,442 × 1,326 logical
+canvas produced 3,995,744 RGBA bytes, below the unchanged one-million-pixel cap.
+These are observations from an optimized test build, not worst-case guarantees;
+complex inputs still time out. Ordinary tests omit this hardware-dependent
+check. Raw outputs remain local.
+
 ## Review and validation
 
 Review public API changes, source/raster limits, process cleanup and platform

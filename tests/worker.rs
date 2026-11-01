@@ -16,6 +16,9 @@ fn main() {
         worker::worker_main().unwrap();
         return;
     }
+    if std::env::args().any(|arg| arg == "--large") {
+        large_flowchart();
+    }
     let cancel = Arc::new(AtomicBool::new(false));
     let mut worker = Worker::spawn(&std::env::current_exe().unwrap(), "--mermaid-worker").unwrap();
     // Each diagram's logical size, in both themes. A change means the renderer,
@@ -189,4 +192,43 @@ fn main() {
         times[0],
         times[1..].iter().copied().fold(0., f64::max)
     );
+}
+
+// Opt-in because this exercises an interactive deadline, not just correctness.
+// Run in an optimized profile with the unreleased routing-policy fix.
+fn large_flowchart() {
+    let mut source = String::from("flowchart TD\nN0 --> N1\n");
+    for n in 1..256 {
+        source.push_str(&format!("N{n} --> N{}\n", n * 2));
+        if n % 2 == 0 {
+            source.push_str(&format!("N{n} --> N{}\n", n + 1));
+        }
+    }
+    source.push_str("classDef marked fill:#ffcc00,stroke:#112233\nclass N0,N2,N510 marked\n");
+    for light in [false, true] {
+        let start = Instant::now();
+        let mut worker =
+            Worker::spawn(&std::env::current_exe().unwrap(), "--mermaid-worker").unwrap();
+        let image = worker
+            .render(
+                &source,
+                light,
+                RasterOptions::scaled(2.),
+                std::time::Duration::from_secs(2),
+                &AtomicBool::new(false),
+            )
+            .unwrap()
+            .expect("384-node flowchart");
+        assert!(image.original_width > 8192);
+        assert!(image.width as usize * image.height as usize <= document_graphics::MAX_PIXELS);
+        assert_eq!(image.rgba.len(), (image.width * image.height * 4) as usize);
+        assert!(image.rgba.as_chunks::<4>().0.iter().any(|p| p[3] > 0));
+        println!(
+            "large flowchart, light={light}: cold {:.2} ms, {}x{} logical, {} raster bytes",
+            start.elapsed().as_secs_f64() * 1000.,
+            image.original_width,
+            image.original_height,
+            image.rgba.len()
+        );
+    }
 }

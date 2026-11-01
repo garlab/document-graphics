@@ -159,9 +159,9 @@ fn response(input: &mut impl Read, bounds: (u32, u32)) -> io::Result<Option<Rast
     let pixels = u64::from(width) * u64::from(height);
     if original_width == 0
         || original_height == 0
-        || original_width > 8192
-        || original_height > 8192
-        || u64::from(original_width) * u64::from(original_height) > 4_000_000
+        || original_width > crate::svg::MAX_DIAGRAM_EDGE
+        || original_height > crate::svg::MAX_DIAGRAM_EDGE
+        || u64::from(original_width) * u64::from(original_height) > crate::svg::MAX_DIAGRAM_AREA
         || width == 0
         || height == 0
         || width > bounds.0
@@ -376,6 +376,21 @@ mod tests {
             .unwrap();
         assert_eq!((p.width, p.height), (2, 1));
         assert_eq!(p.rgba, data[20..]);
+        // Large logical dimensions do not increase the pixel allocation.
+        data[12..16].copy_from_slice(&10000_u32.to_le_bytes());
+        data[16..20].copy_from_slice(&1500_u32.to_le_bytes());
+        let p = response(&mut &data[..], (MAX_EDGE, MAX_EDGE))
+            .unwrap()
+            .unwrap();
+        assert_eq!((p.original_width, p.original_height), (10000, 1500));
+        assert_eq!(p.rgba.len(), 8);
+        data[12..16].copy_from_slice(&(crate::svg::MAX_DIAGRAM_EDGE + 1).to_le_bytes());
+        assert!(response(&mut &data[..], (MAX_EDGE, MAX_EDGE)).is_err());
+        data[12..16].copy_from_slice(&32000_u32.to_le_bytes());
+        data[16..20].copy_from_slice(&32000_u32.to_le_bytes());
+        assert!(response(&mut &data[..], (MAX_EDGE, MAX_EDGE)).is_err());
+        data[12..16].copy_from_slice(&1_u32.to_le_bytes());
+        data[16..20].copy_from_slice(&1_u32.to_le_bytes());
         assert!(response(&mut &data[..27], (MAX_EDGE, MAX_EDGE)).is_err());
         assert!(response(&mut &data[..], (1, 1)).is_err());
         assert!(
