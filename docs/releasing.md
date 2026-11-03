@@ -37,6 +37,11 @@ cargo test --no-default-features --features image-worker --lib --test images --l
 cargo test --all-features --test images --locked
 ```
 
+The private request guards and child cleanup are shared between image and
+Mermaid workers in the same unreleased version. No public API, dependency or
+protocol change is required for this cleanup. Renderer sandbox policies remain
+separate. Tests cover cancellation, late replies, memory polling and reaping.
+
 See [image extraction measurements](image-extraction.md) for the output and
 performance comparison. Raw data and dependency overrides remain local.
 

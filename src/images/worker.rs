@@ -3,6 +3,7 @@ use super::{
     Frame, Info, Pixels, Region, check,
     protocol::{self, Operation, Response},
 };
+use crate::process::{RequestError, RequestGuard, kill_and_reap};
 #[cfg(unix)]
 use std::io::Write;
 use std::{fs::File, path::Path, sync::atomic::AtomicBool};
@@ -17,7 +18,6 @@ enum Answer {
 }
 
 const TIMEOUT: Duration = Duration::from_secs(10);
-#[cfg(target_os = "macos")]
 const RSS_LIMIT: u64 = 256 * 1024 * 1024;
 pub struct Worker {
     child: Child,
@@ -112,8 +112,7 @@ impl Worker {
         let result = self.request(operation, cancel);
         if result.is_err() {
             self.failed = true;
-            let _ = self.child.kill();
-            let _ = self.child.wait();
+            kill_and_reap(&mut self.child);
         }
         result
     }
@@ -125,11 +124,7 @@ impl Worker {
         protocol::write(&mut self.input, &operation).map_err(|e| e.to_string())?;
         let mut reader = Interruptible {
             worker: self,
-            cancel,
-            deadline: Instant::now() + TIMEOUT,
-            memory_check: Instant::now(),
-            #[cfg(target_os = "macos")]
-            memory_limit: RSS_LIMIT,
+            guard: RequestGuard::new(cancel, Instant::now() + TIMEOUT, RSS_LIMIT),
         };
         let response: Response = protocol::read(&mut reader).map_err(|e| e.to_string())?;
         match response {
@@ -164,41 +159,31 @@ impl Worker {
 }
 impl Drop for Worker {
     fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        kill_and_reap(&mut self.child);
     }
 }
 struct Interruptible<'a> {
     worker: &'a mut Worker,
-    cancel: &'a AtomicBool,
-    deadline: Instant,
-    memory_check: Instant,
-    #[cfg(target_os = "macos")]
-    memory_limit: u64,
+    guard: RequestGuard<'a>,
 }
 impl Interruptible<'_> {
     fn resources(&mut self, force: bool) -> io::Result<()> {
-        check(self.cancel).map_err(io::Error::other)?;
-        let now = Instant::now();
-        if now >= self.deadline {
-            return Err(io::Error::other(
-                "Image decode exceeded 10 seconds; use Source/Binary or retry",
-            ));
-        }
-        if force || now >= self.memory_check {
-            self.memory_check = now + Duration::from_millis(20);
-            #[cfg(target_os = "macos")]
-            {
-                let rss = crate::process::resident_bytes(self.worker.child.id())
-                    .ok_or_else(|| io::Error::other("Cannot monitor image worker memory"))?;
-                if rss > self.memory_limit {
-                    return Err(io::Error::other(
-                        "Image decoder exceeded 256 MiB; overview or Binary remains available",
-                    ));
-                }
-            }
-        }
-        Ok(())
+        self.guard
+            .check(self.worker.child.id(), force)
+            .map_err(|error| {
+                io::Error::other(match error {
+                    RequestError::Cancelled => super::CANCELLED,
+                    RequestError::TimedOut => {
+                        "Image decode exceeded 10 seconds; use Source/Binary or retry"
+                    }
+                    #[cfg(target_os = "macos")]
+                    RequestError::MemoryUnavailable => "Cannot monitor image worker memory",
+                    #[cfg(target_os = "macos")]
+                    RequestError::MemoryExceeded => {
+                        "Image decoder exceeded 256 MiB; overview or Binary remains available"
+                    }
+                })
+            })
     }
 }
 impl Read for Interruptible<'_> {
@@ -236,7 +221,7 @@ pub fn worker_main() -> Result<(), String> {
     #[cfg(unix)]
     {
         #[cfg(target_os = "macos")]
-        crate::process::restrict_image_worker()?;
+        restrict_worker()?;
         // SAFETY: child-only process resource settings and a terminating backstop.
         unsafe {
             libc::setrlimit(
@@ -307,6 +292,49 @@ pub fn worker_main() -> Result<(), String> {
     #[cfg(not(unix))]
     Err("Isolated image previews are unavailable on this platform".into())
 }
+#[cfg(target_os = "macos")]
+fn restrict_worker() -> Result<(), String> {
+    unsafe extern "C" {
+        fn sandbox_init(
+            profile: *const std::ffi::c_char,
+            flags: u64,
+            error: *mut *mut std::ffi::c_char,
+        ) -> i32;
+        fn sandbox_free_error(error: *mut std::ffi::c_char);
+    }
+    // Fail closed if the native-codec sandbox cannot be installed. Reads remain available to
+    // Core Graphics/font services; writes, networking and child execution do not.
+    let profile = c"(version 1)(allow default)(deny network*)(deny file-write*)(deny process-exec)(deny process-fork)";
+    let mut error = std::ptr::null_mut();
+    // SAFETY: constant NUL-terminated profile; error is allocated by sandbox_init.
+    let result = unsafe { sandbox_init(profile.as_ptr(), 0, &mut error) };
+    if result != 0 {
+        let message = if error.is_null() {
+            "Cannot restrict image worker".into()
+        } else {
+            unsafe { std::ffi::CStr::from_ptr(error) }
+                .to_string_lossy()
+                .into_owned()
+        };
+        unsafe {
+            sandbox_free_error(error);
+        }
+        return Err(message);
+    }
+    // SAFETY: process-local priority and core-dump resource limits.
+    unsafe {
+        libc::setpriority(libc::PRIO_PROCESS, 0, 10);
+        libc::setrlimit(
+            libc::RLIMIT_CORE,
+            &libc::rlimit {
+                rlim_cur: 0,
+                rlim_max: 0,
+            },
+        );
+    }
+    Ok(())
+}
+
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
@@ -314,41 +342,6 @@ mod tests {
         Arc,
         atomic::{AtomicBool, Ordering},
     };
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn memory_and_deadline_guards_interrupt_a_stuck_decoder() {
-        let source = tempfile::NamedTempFile::new().unwrap();
-        let cancel = Arc::new(AtomicBool::new(false));
-        let source_file = source.reopen().unwrap();
-        let mut command = Command::new("/bin/sleep");
-        command.arg("60");
-        let mut worker = Worker::start(command, source_file).unwrap();
-        let mut reader = Interruptible {
-            worker: &mut worker,
-            cancel: &cancel,
-            deadline: Instant::now() + Duration::from_secs(1),
-            memory_check: Instant::now(),
-            #[cfg(target_os = "macos")]
-            memory_limit: RSS_LIMIT,
-        };
-        reader.resources(true).unwrap();
-        reader.memory_limit = 1;
-        assert!(
-            reader
-                .resources(true)
-                .unwrap_err()
-                .to_string()
-                .contains("256 MiB")
-        );
-        reader.deadline = Instant::now();
-        assert!(
-            reader
-                .resources(true)
-                .unwrap_err()
-                .to_string()
-                .contains("10 seconds")
-        );
-    }
     #[test]
     fn cancellation_kills_and_reaps_a_stuck_decoder() {
         let file = tempfile::NamedTempFile::new().unwrap();

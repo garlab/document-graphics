@@ -282,6 +282,14 @@ The library owns these mechanisms. A terminal app can retain a five-second total
 budget; a desktop app can reuse a worker through a bounded queue and retire it on
 idle. Neither policy is imposed on the other application.
 
+The Mermaid and image clients share private cancellation/deadline guards,
+20 ms macOS memory-sampling checks, and child termination/reaping. Their wire
+protocols, I/O loops, error reporting and sandbox profiles remain separate.
+Request limits, timeouts and application queue/cache policies are unchanged.
+Mermaid retains best-effort memory sampling; image requests fail if their worker
+cannot be monitored. A completed reply still has to pass its cancellation and
+deadline checks before the application receives it.
+
 ## Development
 
 This is a standalone library repository, shared by mdviewer and Plastext.

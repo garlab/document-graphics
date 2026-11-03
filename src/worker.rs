@@ -2,6 +2,7 @@
 use crate::{
     MAX_PIXELS, Raster, RasterOptions,
     mermaid::{self, MAX_SOURCE},
+    process::{RequestError, RequestGuard, kill_and_reap},
 };
 use std::{
     io::{self, Read, Write},
@@ -16,11 +17,7 @@ use std::{
 };
 /// A worker exits after this many requests; applications can recycle it sooner.
 pub const MAX_REQUESTS: usize = 32;
-#[cfg(target_os = "macos")]
 const MAX_RESIDENT_BYTES: u64 = 256 * 1024 * 1024;
-
-#[cfg(target_os = "macos")]
-use crate::process::resident_bytes;
 
 /// Private child entry point; invoke before application initialization.
 pub fn worker_main() -> io::Result<()> {
@@ -220,8 +217,7 @@ impl Worker {
                 completed: 0,
             }),
             Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
+                kill_and_reap(&mut child);
                 Err(error)
             }
         }
@@ -272,6 +268,7 @@ impl Worker {
         let deadline = Instant::now()
             .checked_add(timeout)
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Invalid render timeout"))?;
+        let mut guard = RequestGuard::new(cancel, deadline, MAX_RESIDENT_BYTES);
         let bounds = options.bounds;
         let mut message = Vec::with_capacity(25 + source.len());
         message.extend_from_slice(b"NPV1");
@@ -287,20 +284,13 @@ impl Worker {
             .try_send((message, bounds))
             .map_err(|_| io::Error::other("Mermaid worker unavailable"))?;
         loop {
-            if cancel.load(Ordering::Relaxed) {
-                return Err(io::Error::new(
-                    io::ErrorKind::Interrupted,
-                    "Diagram cancelled",
-                ));
+            match guard.check(self.child.id(), false) {
+                // Preserve the diagram worker's best-effort RSS monitoring.
+                #[cfg(target_os = "macos")]
+                Err(RequestError::MemoryUnavailable) => {}
+                result => result.map_err(request_error)?,
             }
-            if Instant::now() >= deadline {
-                return Err(io::Error::new(io::ErrorKind::TimedOut, "Diagram timed out"));
-            }
-            #[cfg(target_os = "macos")]
-            if resident_bytes(self.child.id()).is_some_and(|n| n > MAX_RESIDENT_BYTES) {
-                return Err(io::Error::other("Diagram exceeded its memory limit"));
-            }
-            let remaining = deadline.saturating_duration_since(Instant::now());
+            let remaining = guard.remaining();
             match self
                 .replies
                 .recv_timeout(remaining.min(Duration::from_millis(20)))
@@ -308,12 +298,7 @@ impl Worker {
                 Ok(result) => {
                     // A queued reply does not override cancellation or a deadline
                     // reached while this thread was waiting to be scheduled.
-                    if cancel.load(Ordering::Relaxed) {
-                        return Err(io::ErrorKind::Interrupted.into());
-                    }
-                    if Instant::now() >= deadline {
-                        return Err(io::ErrorKind::TimedOut.into());
-                    }
+                    guard.check_completion().map_err(request_error)?;
                     self.completed += 1;
                     return result;
                 }
@@ -325,8 +310,7 @@ impl Worker {
     fn stop(&mut self) {
         // The worker starts no descendants. Killing it closes both pipes and
         // unblocks the I/O thread even after a partial write or partial reply.
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        kill_and_reap(&mut self.child);
         self.requests.take();
         if let Some(thread) = self.thread.take() {
             let _ = thread.join();
@@ -337,6 +321,17 @@ impl Worker {
 impl Drop for Worker {
     fn drop(&mut self) {
         self.stop();
+    }
+}
+
+fn request_error(error: RequestError) -> io::Error {
+    match error {
+        RequestError::Cancelled => io::Error::new(io::ErrorKind::Interrupted, "Diagram cancelled"),
+        RequestError::TimedOut => io::Error::new(io::ErrorKind::TimedOut, "Diagram timed out"),
+        #[cfg(target_os = "macos")]
+        RequestError::MemoryExceeded => io::Error::other("Diagram exceeded its memory limit"),
+        #[cfg(target_os = "macos")]
+        RequestError::MemoryUnavailable => io::Error::other("Cannot monitor diagram worker memory"),
     }
 }
 
