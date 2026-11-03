@@ -19,6 +19,39 @@ Run Cargo from that consumer's root. Keep the library checkout outside its
 `target/` directory so cleaning build artifacts cannot remove source. Published
 consumers use a versioned registry dependency; local overrides are temporary.
 
+## Backend 0.1.3 release
+
+Version 0.1.3 pins published `document-graphics-mermaid` 0.1.3. It reduces
+repeated segment comparisons and temporary node-ID allocations in flowchart
+routing, and uses the primary text color for quadrant axis labels. Search tiers,
+route scoring, the adapter API, worker protocol and resource limits are unchanged.
+No dependencies are added. The lockfile resolves the backend from crates.io,
+without a local backend override.
+
+The backend's routing comparison preserved byte-identical SVG across all 61
+benchmark fixtures; the separate quadrant color fix intentionally changes axis
+text in themes with different primary and secondary text colors. Its native
+32-node/60-edge chain benchmark improved from 368.4 to 221.0 ms for layout.
+See the fork's [routing measurements](https://github.com/garlab/mermaid-rs-renderer/blob/fork-release/docs/flowchart-routing-architecture.md#routing-comparison-cost)
+for methodology and limits. These measurements describe the backend change,
+not a new measurement of this library's entire worker pipeline.
+
+The 2026-11-03 release checks passed library tests (including SGF and the macOS
+worker sandbox), Clippy, Rust 1.90, and package verification. Consumer checks
+passed 62 terminal-viewer Rust tests, 44 direct-output PTY tests, 11 pager PTY
+tests, and 26 GUI-consumer worker renders. Integration builds override only this
+library; the backend comes from crates.io. Application version-pin updates follow
+publication of this library.
+
+A short release-build smoke measurement used the same Apple M2 Pro / 16 GiB,
+macOS 26.4.1, Rust 1.99.0, 100×40 PTY, 10×20-pixel cells, one warm-up and three
+fresh measured processes per case. The 13-diagram fixture took 47.1 ms,
+100 repeated diagrams 24.2 ms, and the 32-node/60-edge chain 274.5 ms. The chain
+emitted five readable image bands and 135,558 bytes, with a 19.20 MiB reported
+process RSS peak. These are smoke-check medians, not an interleaved comparison;
+RSS does not include a sampled concurrent worker total, and emulator painting
+is excluded. Raw results remain outside the repository.
+
 ## Large-flowchart validation
 
 Version 0.1.2 pins the published `document-graphics-mermaid` 0.1.2 backend.
@@ -38,6 +71,10 @@ canvas produced 3,995,744 RGBA bytes, below the unchanged one-million-pixel cap.
 These are observations from an optimized test build, not worst-case guarantees;
 complex inputs still time out. Ordinary tests omit this hardware-dependent
 check. Raw outputs remain local.
+
+The same optimized check with published backend 0.1.3 took 0.66–0.68 seconds
+on 2026-11-03, preserving the logical dimensions and 3,995,744 raster bytes in
+both themes. The two-second deadline and pixel cap remain unchanged.
 
 ## Review and validation
 

@@ -33,7 +33,7 @@ Requires Rust 1.90 or newer.
 
 ```toml
 [dependencies]
-document-graphics = "0.1.2"
+document-graphics = "0.1.3"
 ```
 
 Handle the private worker argument before initializing the application:
@@ -78,8 +78,12 @@ bounded arrow markers. Mermaid parsing and layout are private to the worker;
 there is no public in-process Mermaid entry point.
 
 The expanded Mermaid limits are available from 0.1.2, using the published
-`document-graphics-mermaid` 0.1.2 backend. They retain the existing worker memory
+`document-graphics-mermaid` backend. They retain the existing worker memory
 and raster budgets.
+
+Version 0.1.3 pins `document-graphics-mermaid` 0.1.3 for faster flowchart route
+comparisons and improved quadrant-axis label contrast. The public API, worker
+protocol, feature defaults and resource limits are unchanged.
 
 ## SGF Go records
 
