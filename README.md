@@ -16,7 +16,8 @@ and foreign content.
 
 The library renders the graphical content of documents independently of their
 layout or user interface. Today it supports Mermaid diagrams, a restricted
-SVG subset and Go positions from SGF records (`sgf` feature). Image decoding,
+SVG subset, Go positions from SGF records (`sgf` feature), and standard chess
+from PGN/FEN records (`chess` feature, unreleased 0.1.4). Image decoding,
 other diagram formats and music notation are possible future modules; they are
 not implemented here yet.
 Applications own document layout, interaction, scheduling and cache budgets.
@@ -132,6 +133,56 @@ renders roots and leaves without modifying any input:
 
 ```sh
 cargo run --release --features sgf --example sgf_probe -- path/to/sgf-directory
+```
+
+## Chess records (unreleased 0.1.4)
+
+Enable the optional `chess` feature for standard-chess PGN collections and FEN
+positions. It adds the MIT-licensed `cozy-chess` move generator and its types
+crate. There is no engine, network access, runtime installation or system-font
+requirement. Chess piece silhouettes are original vector paths under this
+crate's MIT license.
+
+```rust
+# #[cfg(feature = "chess")] {
+use document_graphics::{chess::{Collection, Format, RenderOptions, rasterize}, RasterOptions};
+use std::sync::{Arc, atomic::AtomicBool};
+let cancel = AtomicBool::new(false);
+let source: Arc<[u8]> = Arc::from(&b"1.e4 e5 (1...c5 {Sicilian}) 2.Nf3 *"[..]);
+let collection = Collection::parse(source, Format::Pgn, &cancel)?;
+let position = collection.position(2, &cancel)?;
+let image = rasterize(&position, RenderOptions::default(), RasterOptions::scaled(2.), &cancel)?;
+# }
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+SAN moves, castling, en passant, promotions, disambiguation, nested variations,
+comments, annotation glyphs, tags, results and FEN starting positions are
+supported. `Format::Fen` accepts one standard six-field FEN per nonempty line.
+UTF-8 text falls back to Latin-1 for older PGN annotations. Chess variants are
+rejected; engine annotations and drawing extensions remain comment text.
+
+Parsing builds a compact source/tree index, with one initial board per game.
+It does not validate every move eagerly. `Collection::position` replays the
+requested line with legal moves; `Position::advance` handles a direct child.
+Illegal or ambiguous moves return an error rather than a guessed position.
+Applications own navigation, comments, cache policy and draw adjudication.
+`RenderOptions::flipped` changes perspective; the last move is highlighted.
+
+Limits: 8 MiB source, 100,000 nodes, 1,024 games, 128 variation levels, 16,384
+half-moves per line, 128 tags per game, 64 KiB per tag/comment budget per node,
+128 annotations per node and 300,000 annotations total. Tokens are limited to
+32 bytes. Output retains the existing one-million-pixel raster cap.
+
+This bounded, iterative parser and replay run in-process with cooperative
+cancellation, followed by restricted SVG rendering. They do not use the
+Mermaid worker's OS sandbox or hard deadline. Schedule them off the UI thread,
+coalesce obsolete requests and preserve readable source on failure.
+
+The read-only corpus probe checks all positions and renders roots/leaves:
+
+```sh
+cargo run --release --features chess --example chess_probe -- path/to/chess-records
 ```
 
 ## Worker lifecycle

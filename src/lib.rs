@@ -1,5 +1,7 @@
 #![doc = include_str!("../README.md")]
 
+#[cfg(feature = "chess")]
+pub mod chess;
 pub mod mermaid;
 #[cfg(feature = "sgf")]
 pub mod sgf;
