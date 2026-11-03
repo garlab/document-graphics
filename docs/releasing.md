@@ -19,19 +19,22 @@ Run Cargo from that consumer's root. Keep the library checkout outside its
 `target/` directory so cleaning build artifacts cannot remove source. Published
 consumers use a versioned registry dependency; local overrides are temporary.
 
-## Image extraction (unreleased 0.1.5)
+## Version 0.1.5
 
-The optional image APIs include the chess work prepared in 0.1.4. Plastext uses
-`sgf`, `chess` and `image-native`; mdviewer enables only `images` and retains the
-strict document SVG renderer. Consumers temporarily pin 0.1.5 through ignored
-local overrides until publication. Publish manually after review, then remove
-consumer overrides and update their lockfiles to the registry source/checksum.
+This release adds optional PGN/FEN chess rendering and bounded image APIs.
+Plastext uses `sgf`, `chess` and `image-native`; mdviewer enables only `images`
+and retains the strict document SVG renderer. Consumers temporarily pin 0.1.5
+through ignored local overrides until publication. Publish through the version-tag workflow
+below, then remove consumer overrides and update their lockfiles to the registry
+source/checksum. No Mermaid backend or math release is required.
 
 Image codec, protocol and pixel tests live here. Consumers test their own file
 policies, immutable snapshots, queues, terminal placement and cache budgets.
-In addition to the regular release checks, exercise the portable worker:
+In addition to the regular release checks, exercise the minimal and portable
+feature combinations:
 
 ```sh
+cargo test --no-default-features --lib --locked
 cargo test --no-default-features --features images --lib --locked
 cargo test --no-default-features --features image-worker --lib --test images --locked
 cargo test --all-features --test images --locked
@@ -44,6 +47,18 @@ separate. Tests cover cancellation, late replies, memory polling and reaping.
 
 See [image extraction measurements](image-extraction.md) for the output and
 performance comparison. Raw data and dependency overrides remain local.
+
+The release workflow verifies all features and the minimal image feature sets on
+Linux and macOS before publishing. CI also checks Windows and Rust 1.90. Package
+verification includes optional modules and their fixtures. docs.rs builds all
+features so the chess and image APIs appear in the published documentation.
+
+Release validation passed the four feature combinations above, Clippy, Rust
+1.90, and package verification. mdviewer passed 68 Rust tests, 44 direct-output
+PTY tests and 11 pager/watch PTY tests. Plastext passed the assets, math, platform
+and UI tests, including its image snapshot/broker and Mermaid worker integration
+tests. These are automated checks; native GUI playback and terminal emulator
+painting still require manual review.
 
 ## Backend 0.1.3 release
 
@@ -114,7 +129,7 @@ cargo clippy --all-targets --all-features --no-deps --locked -- -D warnings
 cargo test --all-features --locked
 cargo +1.90.0 check --all-targets --all-features --locked
 cargo package --list --locked
-cargo package --locked
+cargo package --all-features --locked
 ```
 
 The package command packages and verifies this library against its published

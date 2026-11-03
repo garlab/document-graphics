@@ -81,8 +81,9 @@ portable API also enforces tiny output budgets for extremely narrow images.
 Native GUI zoom/playback interactions still need manual review.
 
 Both consumers temporarily pin 0.1.5 through ignored local overrides. After
-manual publication, remove those overrides and update both Cargo.lock files to
-the registry source/checksum. No Mermaid backend or math release is needed.
+publication through the [release workflow](releasing.md#publication), remove
+those overrides and update both Cargo.lock files to the registry source/checksum.
+No Mermaid backend or math release is needed.
 
 ## Private worker cleanup
 
@@ -108,3 +109,31 @@ passed, together with Linux/Windows cross-compilation checks. Both Plastext
 worker adapters passed integration tests. mdviewer passed its 68 Rust tests,
 44 terminal checks and 11 pager checks. Cancellation, partial replies, late
 completion, memory limits and process reaping remain covered by regression tests.
+
+## Release verification
+
+A fresh comparison of mdviewer `3b851f8` against `71ea666` with this library at
+`8d4ab41` preserved byte-identical terminal output in 32 cases: image, inline,
+math, table, Mermaid, style, code and extension fixtures, each at 24 and 100
+columns in both themes. The release binary grew from 16,995,264 to 16,995,328
+bytes. The active feature graph still contains only PNG/JPEG image codecs and
+bundled-font SVG rendering; native workers and system-font loading remain disabled.
+
+The same machine and release profiles described above were used with a drained
+100 × 40 PTY and 10 × 20-pixel cells. Each case had one warm-up followed by five
+fresh processes per binary, alternating version order. All runs completed with
+expected image counts and identical output sizes. Values below are medians;
+RSS is per-process `wait4` peak RSS, not a sampled concurrent process-tree total.
+
+| Case | Before | After | RSS before → after |
+| --- | ---: | ---: | ---: |
+| 100 repeated images | 26.83 ms | 27.13 ms | 4.06 → 4.09 MiB |
+| 32 distinct images | 6.21 ms | 5.99 ms | 5.72 → 5.69 MiB |
+| SVG image | 4.29 ms | 4.35 ms | 4.33 → 4.25 MiB |
+| 1,000 equations | 382.1 ms | 382.9 ms | 11.47 → 11.56 MiB |
+| Dense 32-node / 60-edge flowchart | 263.1 ms | 261.6 ms | 19.16 → 19.67 MiB |
+| 10 MiB mixed Markdown | 938.7 ms | 942.2 ms | 58.33 → 58.16 MiB |
+
+These short runs show no material time or memory regression. They exclude
+emulator painting and do not replace the fixed application performance baseline.
+Raw samples and generated inputs remain outside the repositories.

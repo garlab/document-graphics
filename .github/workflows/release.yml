@@ -18,7 +18,12 @@ env:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    name: Verify (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-15]
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
     steps:
@@ -40,8 +45,11 @@ jobs:
             echo "::error::$TAG isn't on main: push main, then re-run this workflow"
             exit 1
           fi
+      - run: cargo test --no-default-features --lib --locked
+      - run: cargo test --no-default-features --features images --lib --locked
+      - run: cargo test --no-default-features --features image-worker --lib --test images --locked
       - run: cargo test --all-features --locked
-      - run: cargo publish -p document-graphics --dry-run --locked
+      - run: cargo publish -p document-graphics --all-features --dry-run --locked
 
   publish:
     needs: verify

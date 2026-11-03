@@ -1,6 +1,6 @@
 //! Bounded SGF collections and Go positions. No file access or application cache.
 //!
-//! FF[4] Go (GM[1]), including variations, setup stones, captures and annotations.
+//! `FF[4]` Go (`GM[1]`), including variations, setup stones, captures and annotations.
 //! SGF records describe positions even when moves violate competitive rules;
 //! replay deliberately does not enforce turn order, ko, or move legality.
 use std::{
