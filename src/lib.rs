@@ -2,7 +2,10 @@
 
 #[cfg(feature = "chess")]
 pub mod chess;
+#[cfg(feature = "images")]
+pub mod images;
 pub mod mermaid;
+mod process;
 #[cfg(feature = "sgf")]
 pub mod sgf;
 pub mod svg;

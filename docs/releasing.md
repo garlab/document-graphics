@@ -19,6 +19,27 @@ Run Cargo from that consumer's root. Keep the library checkout outside its
 `target/` directory so cleaning build artifacts cannot remove source. Published
 consumers use a versioned registry dependency; local overrides are temporary.
 
+## Image extraction (unreleased 0.1.5)
+
+The optional image APIs include the chess work prepared in 0.1.4. Plastext uses
+`sgf`, `chess` and `image-native`; mdviewer enables only `images` and retains the
+strict document SVG renderer. Consumers temporarily pin 0.1.5 through ignored
+local overrides until publication. Publish manually after review, then remove
+consumer overrides and update their lockfiles to the registry source/checksum.
+
+Image codec, protocol and pixel tests live here. Consumers test their own file
+policies, immutable snapshots, queues, terminal placement and cache budgets.
+In addition to the regular release checks, exercise the portable worker:
+
+```sh
+cargo test --no-default-features --features images --lib --locked
+cargo test --no-default-features --features image-worker --lib --test images --locked
+cargo test --all-features --test images --locked
+```
+
+See [image extraction measurements](image-extraction.md) for the output and
+performance comparison. Raw data and dependency overrides remain local.
+
 ## Backend 0.1.3 release
 
 Version 0.1.3 pins published `document-graphics-mermaid` 0.1.3. It reduces

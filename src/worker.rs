@@ -20,25 +20,7 @@ pub const MAX_REQUESTS: usize = 32;
 const MAX_RESIDENT_BYTES: u64 = 256 * 1024 * 1024;
 
 #[cfg(target_os = "macos")]
-fn resident_bytes(pid: u32) -> Option<u64> {
-    let mut info = std::mem::MaybeUninit::<libc::proc_taskinfo>::uninit();
-    let size = std::mem::size_of::<libc::proc_taskinfo>() as i32;
-    // SAFETY: proc_pidinfo initializes this exact structure on a full-size result.
-    let count = unsafe {
-        libc::proc_pidinfo(
-            pid as i32,
-            libc::PROC_PIDTASKINFO,
-            0,
-            info.as_mut_ptr().cast(),
-            size,
-        )
-    };
-    if count == size {
-        Some(unsafe { info.assume_init() }.pti_resident_size)
-    } else {
-        None
-    }
-}
+use crate::process::resident_bytes;
 
 /// Private child entry point; invoke before application initialization.
 pub fn worker_main() -> io::Result<()> {
