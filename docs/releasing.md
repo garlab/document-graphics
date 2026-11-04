@@ -19,14 +19,31 @@ Run Cargo from that consumer's root. Keep the library checkout outside its
 `target/` directory so cleaning build artifacts cannot remove source. Published
 consumers use a versioned registry dependency; local overrides are temporary.
 
+## Version 0.1.6 (unreleased)
+
+Adds `mermaid::Background` and `Worker::render_with_background` for transparent
+diagram canvases. Existing `Worker::render` callers keep their themed canvas and
+the NPV1 request format. Transparent requests use the NPV2 extension; the child
+accepts both versions and rejects unknown flags before reading the source.
+Resource limits, sandbox rules and dependencies are unchanged.
+
+mdviewer opts into transparency and chooses raster scale from terminal cell
+height. That sizing and cache policy stays in the application. Until publication,
+its ignored local override resolves this checkout; publish this crate through
+the usual version-tag workflow, then restore mdviewer's registry lockfile.
+No Mermaid backend or math release is needed.
+
+Checks cover transparency and antialiasing, canvas-colored nodes, ER table fills,
+timeline backgrounds, protocol flag validation and mixed opaque/transparent
+worker requests. The 26 opaque light/dark fixture renders remain byte-identical
+to 0.1.5. See mdviewer's Mermaid documentation for terminal-scale measurements.
+
 ## Version 0.1.5
 
 This release adds optional PGN/FEN chess rendering and bounded image APIs.
 Plastext uses `sgf`, `chess` and `image-native`; mdviewer enables only `images`
-and retains the strict document SVG renderer. Consumers temporarily pin 0.1.5
-through ignored local overrides until publication. Publish through the version-tag workflow
-below, then remove consumer overrides and update their lockfiles to the registry
-source/checksum. No Mermaid backend or math release is required.
+and retains the strict document SVG renderer. Version 0.1.5 is published on
+crates.io; both consumers completed registry validation before the 0.1.6 work.
 
 Image codec, protocol and pixel tests live here. Consumers test their own file
 policies, immutable snapshots, queues, terminal placement and cache budgets.
@@ -41,7 +58,7 @@ cargo test --all-features --test images --locked
 ```
 
 The private request guards and child cleanup are shared between image and
-Mermaid workers in the same unreleased version. No public API, dependency or
+Mermaid workers in the same release. No public API, dependency or
 protocol change is required for this cleanup. Renderer sandbox policies remain
 separate. Tests cover cancellation, late replies, memory polling and reaping.
 

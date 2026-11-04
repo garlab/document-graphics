@@ -6,6 +6,16 @@ pub const MAX_LINES: usize = 1024;
 pub const MAX_NODES: usize = 512;
 pub const MAX_EDGES: usize = 1024;
 
+/// Canvas treatment, independent of light/dark diagram colors and raster fitting.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Background {
+    /// Paint the theme's canvas color (the default for existing callers).
+    #[default]
+    Theme,
+    /// Leave the canvas unpainted so the host surface shows through.
+    Transparent,
+}
+
 /// Reject excessive input and configuration before starting a helper or parser.
 pub fn admissible(source: &str) -> bool {
     if source.is_empty()
@@ -74,12 +84,17 @@ pub fn admissible(source: &str) -> bool {
     !matches!(header, "flowchart" | "graph") || (depth == 0 && !quoted)
 }
 
-pub(crate) fn render(source: &str, light: bool, options: RasterOptions) -> Option<Raster> {
-    let source = diagram_svg(source, light)?;
+pub(crate) fn render(
+    source: &str,
+    light: bool,
+    background: Background,
+    options: RasterOptions,
+) -> Option<Raster> {
+    let source = diagram_svg(source, light, background)?;
     svg::diagram(&source, options).ok()
 }
 
-fn diagram_svg(source: &str, light: bool) -> Option<String> {
+fn diagram_svg(source: &str, light: bool, background: Background) -> Option<String> {
     use mermaid_rs_renderer::{
         DiagramKind, LayoutConfig, Theme, compute_layout, parse_mermaid_strict, render_svg,
     };
@@ -171,7 +186,23 @@ fn diagram_svg(source: &str, light: bool) -> Option<String> {
         config.max_label_width_chars = 1024;
         config.node_padding_x = 48.;
     }
-    let layout = compute_layout(graph, &theme, &config);
+    let mut layout = compute_layout(graph, &theme, &config);
+    if background == Background::Transparent {
+        // ER table bodies also use the canvas color. Keep their resolved fills
+        // explicit, including class/style overrides, before clearing the canvas.
+        if graph.kind == DiagramKind::Er {
+            for node in layout
+                .nodes
+                .values_mut()
+                .filter(|n| n.label.lines.len() > 1)
+            {
+                node.style
+                    .fill
+                    .get_or_insert_with(|| theme.background.clone());
+            }
+        }
+        theme.background = "none".into();
+    }
     let svg = render_svg(&layout, &theme, &config);
     if graph.kind == DiagramKind::Er && !er_content_is_complete(graph, &svg) {
         return None;
@@ -284,7 +315,68 @@ mod tests {
     use super::*;
     use crate::MAX_PIXELS;
     fn render(source: &str, light: bool) -> Option<Raster> {
-        super::render(source, light, RasterOptions::scaled(2.))
+        super::render(source, light, Background::Theme, RasterOptions::scaled(2.))
+    }
+    #[test]
+    fn transparent_canvases_keep_geometry_fills_and_antialiased_edges() {
+        for light in [false, true] {
+            let color = if light { "#ffffff" } else { "#252a33" };
+            let background = if light { [255u32; 3] } else { [37, 42, 51] };
+            for source in [
+                format!("flowchart LR\n A[Keep fill]-->B[Next]\n style A fill:{color}"),
+                "erDiagram\n BOOK {\n int id PK\n string title\n }".into(),
+                "timeline\n title History\n 2020 : Launch\n 2021 : Grow".into(),
+            ] {
+                let options = RasterOptions::scaled(1.5);
+                let opaque = super::render(&source, light, Background::Theme, options).unwrap();
+                let clear =
+                    super::render(&source, light, Background::Transparent, options).unwrap();
+                assert_eq!((clear.width, clear.height), (opaque.width, opaque.height));
+                assert_eq!(
+                    (clear.original_width, clear.original_height),
+                    (opaque.original_width, opaque.original_height)
+                );
+                assert!(clear.rgba.as_chunks::<4>().0.iter().any(|p| p[3] == 0));
+                assert!(
+                    clear
+                        .rgba
+                        .as_chunks::<4>()
+                        .0
+                        .iter()
+                        .any(|p| (1..255).contains(&p[3]))
+                );
+                // A node may deliberately use the canvas color. It must remain
+                // opaque; transparency cannot be implemented as a color key.
+                if source.starts_with("flowchart") {
+                    assert!(clear.rgba.as_chunks::<4>().0.iter().any(|p| {
+                        p[3] == 255
+                            && p[..3]
+                                .iter()
+                                .zip(background)
+                                .all(|(&a, b)| u32::from(a) == b)
+                    }));
+                }
+                // Compositing over the old canvas recovers the original edges,
+                // including ER table bodies and the timeline's nested background.
+                for (a, b) in clear
+                    .rgba
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .zip(opaque.rgba.as_chunks::<4>().0)
+                {
+                    let alpha = u32::from(a[3]);
+                    for i in 0..3 {
+                        let composed =
+                            (u32::from(a[i]) * alpha + background[i] * (255 - alpha) + 127) / 255;
+                        assert!(
+                            composed.abs_diff(u32::from(b[i])) <= 2,
+                            "{source}: {a:?} over {background:?} != {b:?}"
+                        );
+                    }
+                }
+            }
+        }
     }
     #[test]
     fn supported_diagrams_have_bounded_retina_rasters_in_both_themes() {
@@ -328,7 +420,7 @@ mod tests {
     #[test]
     fn er_tables_preserve_types_keys_and_comments() {
         let source = "erDiagram\n BOOK {\n int identifier PK,FK,UK\n varchar title \"display name\"\n decimal(10,2) price\n }\n BOOK ||--o{ PAGE : contains\n PAGE {\n int identifier PK\n int book_id FK\n }";
-        let svg = diagram_svg(source, false).expect("complete attribute table");
+        let svg = diagram_svg(source, false, Background::Theme).expect("complete attribute table");
         let xml = roxmltree::Document::parse(&svg).unwrap();
         let text: Vec<_> = xml
             .descendants()

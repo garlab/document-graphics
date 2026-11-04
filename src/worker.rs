@@ -1,7 +1,7 @@
 //! Isolated rendering, shared wire protocol and process supervision.
 use crate::{
     MAX_PIXELS, Raster, RasterOptions,
-    mermaid::{self, MAX_SOURCE},
+    mermaid::{self, Background, MAX_SOURCE},
     process::{RequestError, RequestGuard, kill_and_reap},
 };
 use std::{
@@ -86,12 +86,12 @@ fn serve(input: &mut impl Read, output: &mut impl Write) -> io::Result<()> {
             bounds: (number(&header[4..8]), number(&header[8..12])),
             scale: f64::from_le_bytes(header[17..25].try_into().unwrap()),
         };
-        if &header[..4] != b"NPV1"
-            || !options.valid()
-            || length == 0
-            || length > MAX_SOURCE
-            || header[16] > 1
-        {
+        let valid_flags = match &header[..4] {
+            b"NPV1" => header[16] <= 1,
+            b"NPV2" => header[16] <= 3,
+            _ => false,
+        };
+        if !valid_flags || !options.valid() || length == 0 || length > MAX_SOURCE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "Invalid diagram request",
@@ -99,9 +99,14 @@ fn serve(input: &mut impl Read, output: &mut impl Write) -> io::Result<()> {
         }
         let mut source = vec![0; length];
         input.read_exact(&mut source)?;
+        let background = if header[16] & 2 == 0 {
+            Background::Theme
+        } else {
+            Background::Transparent
+        };
         let pixels = std::str::from_utf8(&source)
             .ok()
-            .and_then(|s| mermaid::render(s, header[16] == 1, options));
+            .and_then(|s| mermaid::render(s, header[16] & 1 != 0, background, options));
         if let Some(p) = pixels {
             for n in [
                 p.width,
@@ -233,7 +238,22 @@ impl Worker {
         timeout: Duration,
         cancel: &AtomicBool,
     ) -> io::Result<Option<Raster>> {
-        let result = self.render_inner(source, light, options, timeout, cancel);
+        self.render_with_background(source, light, Background::Theme, options, timeout, cancel)
+    }
+
+    /// Render with an explicit canvas treatment. Transparency is applied before
+    /// rasterization, preserving antialiased edges and intentional diagram fills.
+    /// Uses the same limits, cancellation and worker cleanup as [`Self::render`].
+    pub fn render_with_background(
+        &mut self,
+        source: &str,
+        light: bool,
+        background: Background,
+        options: RasterOptions,
+        timeout: Duration,
+        cancel: &AtomicBool,
+    ) -> io::Result<Option<Raster>> {
+        let result = self.render_inner(source, light, background, options, timeout, cancel);
         if result.is_err() {
             self.stop();
         }
@@ -243,6 +263,7 @@ impl Worker {
         &mut self,
         source: &str,
         light: bool,
+        background: Background,
         options: RasterOptions,
         timeout: Duration,
         cancel: &AtomicBool,
@@ -271,11 +292,12 @@ impl Worker {
         let mut guard = RequestGuard::new(cancel, deadline, MAX_RESIDENT_BYTES);
         let bounds = options.bounds;
         let mut message = Vec::with_capacity(25 + source.len());
-        message.extend_from_slice(b"NPV1");
+        let transparent = background == Background::Transparent;
+        message.extend_from_slice(if transparent { b"NPV2" } else { b"NPV1" });
         message.extend_from_slice(&bounds.0.to_le_bytes());
         message.extend_from_slice(&bounds.1.to_le_bytes());
         message.extend_from_slice(&(source.len() as u32).to_le_bytes());
-        message.push(u8::from(light));
+        message.push(u8::from(light) | (u8::from(transparent) << 1));
         message.extend_from_slice(&options.scale.to_le_bytes());
         message.extend_from_slice(source.as_bytes());
         self.requests
@@ -386,6 +408,16 @@ mod tests {
         let mut output = Vec::new();
         assert!(serve(&mut &request[..], &mut output).is_err());
         assert!(output.is_empty());
+        // The original protocol only accepts the light bit; the transparency
+        // extension still rejects unknown flags before reading a source body.
+        request[12..16].copy_from_slice(&1_u32.to_le_bytes());
+        for (magic, flags) in [(b"NPV1", 2), (b"NPV2", 4), (b"NPV2", 255)] {
+            request[..4].copy_from_slice(magic);
+            request[16] = flags;
+            let error = serve(&mut &request[..], &mut output).unwrap_err();
+            assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+            assert!(output.is_empty());
+        }
     }
     #[cfg(unix)]
     #[test]

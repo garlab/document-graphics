@@ -18,7 +18,7 @@ The library renders the graphical content of documents independently of their
 layout or user interface. Today it supports Mermaid diagrams, a restricted
 SVG subset, Go positions from SGF records (`sgf` feature), and standard chess
 from PGN/FEN records (`chess` feature), and bounded image decoding (`images`,
-`image-worker` and `image-native` features, unreleased 0.1.5). Other diagram
+`image-worker` and `image-native` features, available from 0.1.5). Other diagram
 formats and music notation are possible future modules, not implemented here.
 Applications own document layout, interaction, scheduling and cache budgets.
 Equation layout remains in `katex-native`.
@@ -30,12 +30,13 @@ or tile without retaining an image for every item.
 
 ## Integration
 
-Requires Rust 1.90 or newer. Version 0.1.5 is prepared locally, pending release;
-use a [local override](https://github.com/garlab/document-graphics/blob/main/docs/releasing.md#local-dependency-overrides) until publication.
+Requires Rust 1.90 or newer. Version 0.1.6 adds transparent Mermaid canvases and is
+pending release; use a [local override](https://github.com/garlab/document-graphics/blob/main/docs/releasing.md#local-dependency-overrides)
+until publication.
 
 ```toml
 [dependencies]
-document-graphics = "0.1.5"
+document-graphics = "0.1.6"
 ```
 
 Handle the private worker argument before initializing the application:
@@ -62,7 +63,14 @@ fn main() -> std::io::Result<()> {
 
 `RasterOptions::fit((width, height))` fits within physical bounds without upscaling.
 `RasterOptions::scaled(2.)` requests Retina output while preserving logical SVG
-size. Applications can set both fields explicitly. Mermaid input is limited to
+size. Applications can set both fields explicitly. `Worker::render` paints the
+theme's canvas color. To composite onto a terminal or another host surface, use
+`Worker::render_with_background` with `mermaid::Background::Transparent` between
+the light/dark flag and raster options. Transparency is applied before
+rasterization, preserving antialiased edges and intentional node/table fills.
+The existing worker API retains its opaque default.
+
+Mermaid input is limited to
 16 KiB / 1,024 lines, 512 nodes and 1,024 edges. Its generated SVG is limited to
 1 MiB, 16,384 XML nodes, 256 KiB of geometry, a 32,768-unit logical edge and
 64 million logical square units. These logical dimensions do not allocate a
@@ -186,7 +194,7 @@ The read-only corpus probe checks all positions and renders roots/leaves:
 cargo run --release --features chess --example chess_probe -- path/to/chess-records
 ```
 
-## Image decoding (unreleased 0.1.5)
+## Image decoding
 
 All image features are disabled by default. They create no background threads,
 queues or caches until the consumer calls them.

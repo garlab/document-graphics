@@ -1,6 +1,7 @@
 //! Exercise the same isolated worker entry point as the app, without a window.
 use document_graphics::{
     RasterOptions,
+    mermaid::Background,
     worker::{self, Worker},
 };
 use std::{
@@ -192,6 +193,36 @@ fn main() {
         times[0],
         times[1..].iter().copied().fold(0., f64::max)
     );
+    let cancel = AtomicBool::new(false);
+    let mut worker = Worker::spawn(&std::env::current_exe().unwrap(), "--mermaid-worker").unwrap();
+    for light in [false, true] {
+        for background in [Background::Transparent, Background::Theme] {
+            let p = worker
+                .render_with_background(
+                    "flowchart LR; A[Read]-->B[Show]",
+                    light,
+                    background,
+                    RasterOptions {
+                        bounds: (1000, 1000),
+                        scale: 1.5,
+                    },
+                    std::time::Duration::from_secs(2),
+                    &cancel,
+                )
+                .unwrap()
+                .unwrap();
+            assert_eq!(p.width, (f64::from(p.original_width) * 1.5).floor() as u32);
+            assert_eq!(
+                p.rgba[3],
+                if background == Background::Transparent {
+                    0
+                } else {
+                    255
+                }
+            );
+        }
+    }
+    println!("Transparent and opaque worker requests preserve scale and theme");
 }
 
 // Opt-in because this exercises an interactive deadline, not just correctness.
