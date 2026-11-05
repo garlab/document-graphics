@@ -41,6 +41,44 @@ remove the backend override, refresh the lockfile and verify registry provenance
 Publish this crate through the usual version-tag workflow, then restore consumer
 registry lockfiles. mdviewer's Gantt documentation records coverage and measurements.
 
+### Local validation and remaining registry check
+
+Local validation on 2026-11-05 (macOS, Apple Silicon) passed the minimal,
+`images`, `image-worker` and all-feature test configurations, 30 Mermaid worker
+fixture renders, image worker integration, Clippy, Rust 1.90, documentation with
+warnings denied, and all-feature package verification. The package audit checked
+source and test inclusion, font/license files, versioned dependency metadata and
+absence of local paths. The backend publishing dry run also passed.
+
+The terminal consumer passed its Rust, direct-output and pager/watch checks,
+including dated and clock-only Gantt charts, milliseconds, source fallbacks and
+resize/reload behavior. An isolated GUI-consumer checkout, updated to this
+version, passed its graphics-worker integration and Mermaid UI tests. Its old
+assertion that all Gantt syntax is unsupported must be replaced when that
+consumer adopts this release.
+
+These library checks use a local backend override. Before tagging `v0.1.7`:
+
+1. Publish `document-graphics-mermaid` 0.2.0.
+2. Remove only that backend's entry from this checkout's untracked
+   `.cargo/config.toml`, then run:
+
+   ```sh
+   cargo update -p document-graphics-mermaid --precise 0.2.0
+   cargo test --all-features --locked
+   cargo +1.90.0 check --all-targets --all-features --locked
+   cargo publish -p document-graphics --all-features --dry-run --locked
+   ```
+
+3. Confirm that Cargo.lock records the backend's crates.io source and checksum.
+   Commit that lockfile update, push `main`, and wait for CI before tagging.
+   The existing version-tag workflow publishes the library; no manual upload is
+   needed for document-graphics.
+
+The local archive check does not substitute for this registry validation.
+After the library is published, consumers can remove their own local overrides
+and refresh their lockfiles.
+
 ## Version 0.1.6
 
 Adds `mermaid::Background` and `Worker::render_with_background` for transparent
