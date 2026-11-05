@@ -19,24 +19,39 @@ Run Cargo from that consumer's root. Keep the library checkout outside its
 `target/` directory so cleaning build artifacts cannot remove source. Published
 consumers use a versioned registry dependency; local overrides are temporary.
 
-## Version 0.1.6 (unreleased)
+## Version 0.1.7 (unreleased)
+
+Adds native Gantt schedules through backend 0.2.0, with bounded task/date
+collections and complete source fallback on unsupported syntax. The public
+worker API, protocol, sandbox and raster limits retain their existing behavior.
+
+Publish `document-graphics-mermaid` 0.2.0 first, then resolve its registry package
+in this crate before publishing document-graphics 0.1.7. No math release is needed.
+During local integration, add the following override in this crate and in each
+consumer (Cargo does not inherit dependency checkouts' configuration):
+
+```toml
+[patch.crates-io]
+document-graphics-mermaid = { path = "../mermaid-rs-renderer" }
+```
+
+Merge this entry into an existing patch table; keep it untracked. Before release,
+remove the backend override, refresh the lockfile and verify registry provenance.
+Publish this crate through the usual version-tag workflow, then restore consumer
+registry lockfiles. mdviewer's Gantt documentation records coverage and measurements.
+
+## Version 0.1.6
 
 Adds `mermaid::Background` and `Worker::render_with_background` for transparent
 diagram canvases. Existing `Worker::render` callers keep their themed canvas and
 the NPV1 request format. Transparent requests use the NPV2 extension; the child
 accepts both versions and rejects unknown flags before reading the source.
-Resource limits, sandbox rules and dependencies are unchanged.
 
 mdviewer opts into transparency and chooses raster scale from terminal cell
-height. That sizing and cache policy stays in the application. Until publication,
-its ignored local override resolves this checkout; publish this crate through
-the usual version-tag workflow, then restore mdviewer's registry lockfile.
-No Mermaid backend or math release is needed.
-
-Checks cover transparency and antialiasing, canvas-colored nodes, ER table fills,
-timeline backgrounds, protocol flag validation and mixed opaque/transparent
-worker requests. The 26 opaque light/dark fixture renders remain byte-identical
-to 0.1.5. See mdviewer's Mermaid documentation for terminal-scale measurements.
+height. That sizing and cache policy stays in the application. Checks cover
+transparency and antialiasing, canvas-colored nodes, ER table fills, timeline
+backgrounds, protocol flags and mixed opaque/transparent worker requests. The
+26 opaque light/dark fixture renders remain byte-identical to 0.1.5.
 
 ## Version 0.1.5
 
@@ -252,8 +267,8 @@ the library and consumer checks above. Backend upgrades may change layout even
 when the adapter API is unchanged; review any changed fixture dimensions or
 rendered output and compare performance and memory use.
 
-Consumers need only the document-graphics override for local integration tests;
-the backend resolves from crates.io. Release document-graphics through the
+Once backend 0.2.0 is published, consumers need only the document-graphics
+override for local integration tests; the backend resolves from crates.io. Release document-graphics through the
 existing workflow:
 
 1. Set the new version in `Cargo.toml`, run `cargo check` so `Cargo.lock` follows,

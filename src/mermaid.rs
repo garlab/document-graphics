@@ -51,6 +51,7 @@ pub fn admissible(source: &str) -> bool {
             | "timeline"
             | "journey"
             | "quadrantChart"
+            | "gantt"
     ) {
         return false;
     }
@@ -116,6 +117,7 @@ fn diagram_svg(source: &str, light: bool, background: Background) -> Option<Stri
                 | DiagramKind::Timeline
                 | DiagramKind::Journey
                 | DiagramKind::Quadrant
+                | DiagramKind::Gantt
         )
         || graph.nodes.len() > MAX_NODES
         || graph.edges.len() > MAX_EDGES
@@ -203,6 +205,12 @@ fn diagram_svg(source: &str, light: bool, background: Background) -> Option<Stri
         }
         theme.background = "none".into();
     }
+    if matches!(
+        layout.diagram,
+        mermaid_rs_renderer::layout::DiagramData::Error(_)
+    ) {
+        return None;
+    }
     let svg = render_svg(&layout, &theme, &config);
     if graph.kind == DiagramKind::Er && !er_content_is_complete(graph, &svg) {
         return None;
@@ -254,6 +262,13 @@ fn er_content_is_complete(graph: &mermaid_rs_renderer::Graph, svg: &str) -> bool
 }
 
 fn additional_structure_is_bounded(graph: &mermaid_rs_renderer::Graph) -> bool {
+    if graph.kind == mermaid_rs_renderer::DiagramKind::Gantt
+        && (graph.gantt_tasks.len() > 128
+            || graph.gantt_title.as_ref().is_some_and(|s| s.len() > 1024)
+            || graph.gantt_sections.iter().any(|s| s.len() > 1024))
+    {
+        return false;
+    }
     if graph.kind == mermaid_rs_renderer::DiagramKind::Journey {
         let mut actors = std::collections::HashSet::new();
         for node in graph.nodes.values() {
@@ -418,6 +433,49 @@ mod tests {
     }
 
     #[test]
+    fn gantt_keeps_labels_combined_tags_and_transparent_canvases() {
+        let source = "gantt\n title Café release\n axisFormat %d %b\n excludes weekends\n section Build\n Design: done, a, 2026-01-02, 1d\n Révision: crit, active, b, after a, 2d\n Ship: crit, milestone, after b, 0d";
+        for light in [false, true] {
+            let svg = diagram_svg(source, light, Background::Transparent).unwrap();
+            for label in ["Café release", "Design", "Révision", "Ship", "Build", "Jan"] {
+                assert!(svg.contains(label), "missing {label}");
+            }
+            assert!(svg.contains("<polygon"));
+            assert!(svg.contains("#e25555"));
+            let raster = super::render(
+                source,
+                light,
+                Background::Transparent,
+                RasterOptions::fit((800, 800)),
+            )
+            .unwrap();
+            assert!(raster.rgba.as_chunks::<4>().0.iter().any(|p| p[3] == 0));
+            assert!(raster.width as usize * raster.height as usize <= MAX_PIXELS);
+        }
+    }
+
+    #[test]
+    fn gantt_limits_and_invalid_schedules_keep_source() {
+        let mut source = "gantt\nStart: 2026-01-01, 1d\n".to_string();
+        for i in 1..128 {
+            source.push_str(&format!("Task {i}: 1d\n"));
+        }
+        assert!(render(&source, false).is_some());
+        source.push_str("Extra: 1d\n");
+        assert!(render(&source, false).is_none());
+        for source in [
+            "gantt\nA: 2026-01-01, 36601d",
+            "gantt\nA: 2026-02-29, 1d",
+            "gantt\nA: a, after b, 1d\nB: b, after a, 1d",
+            "gantt\nA: after missing, 1d",
+            "gantt\nA: 2026-01-01, 30m",
+            "gantt\naxisFormat %H:%M\nA: 2026-01-01, 1d",
+        ] {
+            assert!(render(source, false).is_none(), "accepted {source}");
+        }
+    }
+
+    #[test]
     fn er_tables_preserve_types_keys_and_comments() {
         let source = "erDiagram\n BOOK {\n int identifier PK,FK,UK\n varchar title \"display name\"\n decimal(10,2) price\n }\n BOOK ||--o{ PAGE : contains\n PAGE {\n int identifier PK\n int book_id FK\n }";
         let svg = diagram_svg(source, false, Background::Theme).expect("complete attribute table");
@@ -492,7 +550,7 @@ mod tests {
     #[test]
     fn unsupported_excessive_or_external_content_keeps_source() {
         for source in [
-            "gantt\nsection Plan\nTask: 2025-01-01, 1d\n",
+            "kanban\n  column[Plan]\n    task[Task]\n",
             "%%{init: {}}%%\nflowchart LR\nA-->B\n",
             "---\ntheme: dark\n---\nflowchart LR; A-->B",
             "flowchart LR\nA\x1b[2J-->B",

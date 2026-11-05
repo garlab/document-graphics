@@ -86,6 +86,11 @@ fn main() {
             Some((309, 247)),
         ),
         (
+            "gantt",
+            "gantt\n title Release\n dateFormat YYYY-MM-DD\n excludes weekends\n section Build\n Café: done, a, 2026-01-02, 1d\n Test: crit, active, after a, 1w\n Ship: milestone, 0d",
+            None,
+        ),
+        (
             "quadrant",
             "quadrantChart\n title Work\n x-axis Low effort --> High effort\n y-axis Low value --> High value\n Task A: [0.2, 0.8]\n Task B: [0.8, 0.3]",
             Some((552, 511)),
@@ -133,7 +138,7 @@ fn main() {
     assert!(
         worker
             .render(
-                "gantt\nTask: 2025-01-01, 1d\n",
+                "gantt\ndateFormat HH:mm\nTask: 12:00, 30m\n",
                 false,
                 RasterOptions::fit((500, 300)),
                 std::time::Duration::from_secs(2),

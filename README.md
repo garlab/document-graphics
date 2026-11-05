@@ -6,7 +6,7 @@ Markdown document model, application cache, broker or background service.
 
 Mermaid supports flowcharts, sequence, class and state diagrams, ER attribute
 tables, pie charts, mind maps, timelines without sections, user journeys and
-quadrant charts. Bundled fonts cover Latin (including accents), Greek and
+quadrant charts, plus day-based Gantt schedules. Bundled fonts cover Latin (including accents), Greek and
 Cyrillic labels. Unsupported syntax and unavailable glyphs return `Ok(None)`
 through the worker so callers can retain the original source. The strict document SVG renderer uses
 bundled KaTeX and Noto Sans fonts and rejects external resources, filters, reuse
@@ -30,13 +30,14 @@ or tile without retaining an image for every item.
 
 ## Integration
 
-Requires Rust 1.90 or newer. Version 0.1.6 adds transparent Mermaid canvases and is
+Requires Rust 1.90 or newer. Version 0.1.7 adds native Gantt support and is
 pending release; use a [local override](https://github.com/garlab/document-graphics/blob/main/docs/releasing.md#local-dependency-overrides)
-until publication.
+until publication. The Gantt backend (`document-graphics-mermaid` 0.2.0) must
+be published first; local development also overrides that package.
 
 ```toml
 [dependencies]
-document-graphics = "0.1.6"
+document-graphics = "0.1.7"
 ```
 
 Handle the private worker argument before initializing the application:
@@ -80,7 +81,15 @@ full-size bitmap: output remains capped at one million pixels and an
 Additional nesting, annotation and label limits apply before expensive work. Pie charts allow
 64 slices, mind maps 128 nodes/depth 32, timelines 64 periods/128 events, journeys
 32 actors with scores 1–5, and quadrant charts 128 points with coordinates 0–1.
-Unsupported timeline sections retain source. Nonfinite chart numbers are rejected.
+Gantt allows 128 tasks, 16 sections, 128 excluded dates, 1 KiB labels/titles,
+128-byte axis formats and a maximum 36,600-day task/chart span. It supports ISO
+dates, integral `d`/`w`/`M`/`y` durations, explicit ends, multiple `after`
+dependencies, combined status tags, milestones and weekend/holiday exclusions.
+Other date formats and unsupported scheduling options return `Ok(None)`;
+unknown IDs and cyclic dependencies do too. No current-date marker is drawn.
+See the [backend contract](https://github.com/garlab/mermaid-rs-renderer/blob/fork-release/docs/gantt.md)
+for the exact subset. Unsupported timeline sections retain source. Nonfinite
+chart numbers are rejected.
 
 Use `svg::rasterize(source, options)` for bounded local SVG. It accepts no file
 paths and does not fetch resources. Only the internal Mermaid route permits
@@ -301,14 +310,16 @@ deadline checks before the application receives it.
 ## Development
 
 This is a standalone library repository, shared by mdviewer and Plastext.
-The Mermaid backend comes from the published
+The Mermaid backend is pinned to version 0.2.0 of the
 [`document-graphics-mermaid`](https://crates.io/crates/document-graphics-mermaid)
 crate, maintained in a [separate fork](https://github.com/garlab/mermaid-rs-renderer).
 It provides caller-supplied font metrics, complete ER key badges, chart-label
-contrast fixes and bounded routing policies for large flowcharts. Its default
+contrast fixes, bounded routing policies for large flowcharts and validated
+Gantt schedules. Its default
 features stay disabled: this library owns SVG rasterization and does not need
 the backend's CLI or PNG renderer.
-All dependencies come from crates.io; no sibling checkout is required.
+Release builds use crates.io dependencies; until backend 0.2.0 is published,
+local integration requires its ignored Cargo override.
 
 ```sh
 cargo fmt --all --check
