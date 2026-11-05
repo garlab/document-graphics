@@ -249,6 +249,8 @@ dependencies = [
 [[package]]
 name = "document-graphics-mermaid"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7308eae350c20181f8a5de0240704509fc0e65330ddf88b1a08b718188e338b8"
 dependencies = [
  "anyhow",
  "fontdb",

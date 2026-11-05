@@ -26,22 +26,16 @@ formats and exact millisecond durations, with bounded task/date collections
 and complete source fallback on unsupported syntax. The public
 worker API, protocol, sandbox and raster limits retain their existing behavior.
 
-Publish `document-graphics-mermaid` 0.2.0 first, then resolve its registry package
-in this crate before publishing document-graphics 0.1.7. No math release is needed.
-During local integration, add the following override in this crate and in each
-consumer (Cargo does not inherit dependency checkouts' configuration):
+Backend `document-graphics-mermaid` 0.2.0 is published. This checkout resolves it
+from crates.io without a local backend override; Cargo.lock records its registry
+source and checksum. No math release is needed. Consumers testing the pending
+library release need only the document-graphics override shown above.
 
-```toml
-[patch.crates-io]
-document-graphics-mermaid = { path = "../mermaid-rs-renderer" }
-```
-
-Merge this entry into an existing patch table; keep it untracked. Before release,
-remove the backend override, refresh the lockfile and verify registry provenance.
-Publish this crate through the usual version-tag workflow, then restore consumer
+Publish this crate through the version-tag workflow after the registry release
+checks below. After publication, remove consumer overrides and restore their
 registry lockfiles. mdviewer's Gantt documentation records coverage and measurements.
 
-### Local validation and remaining registry check
+### Release validation
 
 Local validation on 2026-11-05 (macOS, Apple Silicon) passed the minimal,
 `images`, `image-worker` and all-feature test configurations, 30 Mermaid worker
@@ -57,27 +51,27 @@ version, passed its graphics-worker integration and Mermaid UI tests. Its old
 assertion that all Gantt syntax is unsupported must be replaced when that
 consumer adopts this release.
 
-These library checks use a local backend override. Before tagging `v0.1.7`:
+Registry validation repeated the feature matrix, worker tests, Clippy, Rust 1.90,
+documentation and package checks with published backend 0.2.0. The lockfile change
+adds only its registry source and checksum. All 61 backend source files and the
+original manifest match the tested checkout. Terminal and GUI consumer
+integration checks also pass without a backend override: 75 terminal-viewer
+Rust tests, 53 direct-output checks, 16 pager/watch checks, 30 GUI worker renders
+and two Mermaid UI tests. All 38 terminal/export comparisons are byte-identical
+to the validated local build.
 
-1. Publish `document-graphics-mermaid` 0.2.0.
-2. Remove only that backend's entry from this checkout's untracked
-   `.cargo/config.toml`, then run:
+From this checkout, the final release checks are:
 
-   ```sh
-   cargo update -p document-graphics-mermaid --precise 0.2.0
-   cargo test --all-features --locked
-   cargo +1.90.0 check --all-targets --all-features --locked
-   cargo publish -p document-graphics --all-features --dry-run --locked
-   ```
+```sh
+cargo test --all-features --locked
+cargo +1.90.0 check --all-targets --all-features --locked
+cargo publish -p document-graphics --all-features --dry-run --locked
+```
 
-3. Confirm that Cargo.lock records the backend's crates.io source and checksum.
-   Commit that lockfile update, push `main`, and wait for CI before tagging.
-   The existing version-tag workflow publishes the library; no manual upload is
-   needed for document-graphics.
-
-The local archive check does not substitute for this registry validation.
-After the library is published, consumers can remove their own local overrides
-and refresh their lockfiles.
+Commit the registry lockfile update, push `main`, and wait for CI before tagging
+`v0.1.7`. The existing version-tag workflow publishes the library; no manual
+upload is needed for document-graphics. After publication, consumers can remove
+their remaining document-graphics override and refresh their lockfiles.
 
 ## Version 0.1.6
 
@@ -306,9 +300,8 @@ the library and consumer checks above. Backend upgrades may change layout even
 when the adapter API is unchanged; review any changed fixture dimensions or
 rendered output and compare performance and memory use.
 
-Once backend 0.2.0 is published, consumers need only the document-graphics
-override for local integration tests; the backend resolves from crates.io. Release document-graphics through the
-existing workflow:
+Backend 0.2.0 is published, so consumers need only the document-graphics override
+for local integration tests. Release document-graphics through the existing workflow:
 
 1. Set the new version in `Cargo.toml`, run `cargo check` so `Cargo.lock` follows,
    commit, and push `main`.

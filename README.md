@@ -30,10 +30,10 @@ or tile without retaining an image for every item.
 
 ## Integration
 
-Requires Rust 1.90 or newer. Version 0.1.7 adds native Gantt support and is
-pending release; use a [local override](https://github.com/garlab/document-graphics/blob/main/docs/releasing.md#local-dependency-overrides)
-until publication. The Gantt backend (`document-graphics-mermaid` 0.2.0) must
-be published first; local development also overrides that package.
+Requires Rust 1.90 or newer. Version 0.1.7 adds native Gantt support through
+the published `document-graphics-mermaid` 0.2.0 backend. See
+[local dependency overrides](https://github.com/garlab/document-graphics/blob/main/docs/releasing.md#local-dependency-overrides)
+when developing this library alongside a consumer.
 
 ```toml
 [dependencies]
