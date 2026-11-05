@@ -91,6 +91,11 @@ fn main() {
             None,
         ),
         (
+            "gantt-time",
+            "gantt\n dateFormat HH:mm:ss.SSS\n axisFormat %H:%M:%S.%L\n Read: a, 09:00:00.000, 10ms\n Decode: after a, 25ms\n Display: 15ms",
+            None,
+        ),
+        (
             "quadrant",
             "quadrantChart\n title Work\n x-axis Low effort --> High effort\n y-axis Low value --> High value\n Task A: [0.2, 0.8]\n Task B: [0.8, 0.3]",
             Some((552, 511)),
@@ -138,7 +143,7 @@ fn main() {
     assert!(
         worker
             .render(
-                "gantt\ndateFormat HH:mm\nTask: 12:00, 30m\n",
+                "gantt\ndateFormat HH:mm Z\nTask: 12:00 +00:00, 30m\n",
                 false,
                 RasterOptions::fit((500, 300)),
                 std::time::Duration::from_secs(2),

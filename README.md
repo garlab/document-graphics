@@ -6,7 +6,7 @@ Markdown document model, application cache, broker or background service.
 
 Mermaid supports flowcharts, sequence, class and state diagrams, ER attribute
 tables, pie charts, mind maps, timelines without sections, user journeys and
-quadrant charts, plus day-based Gantt schedules. Bundled fonts cover Latin (including accents), Greek and
+quadrant charts, plus Gantt schedules down to milliseconds. Bundled fonts cover Latin (including accents), Greek and
 Cyrillic labels. Unsupported syntax and unavailable glyphs return `Ok(None)`
 through the worker so callers can retain the original source. The strict document SVG renderer uses
 bundled KaTeX and Noto Sans fonts and rejects external resources, filters, reuse
@@ -83,9 +83,14 @@ Additional nesting, annotation and label limits apply before expensive work. Pie
 32 actors with scores 1–5, and quadrant charts 128 points with coordinates 0–1.
 Gantt allows 128 tasks, 16 sections, 128 excluded dates, 1 KiB labels/titles,
 128-byte axis formats and a maximum 36,600-day task/chart span. It supports ISO
-dates, integral `d`/`w`/`M`/`y` durations, explicit ends, multiple `after`
+dates, clock/date-time formats (`HH:mm`, `HH:mm:ss`, `HH:mm:ss.SSS`),
+`h`/`m`/`s`/`ms` durations with fractions resolving to whole milliseconds,
+integral `d`/`w`/`M`/`y`
+durations, explicit ends, multiple `after`
 dependencies, combined status tags, milestones and weekend/holiday exclusions.
-Other date formats and unsupported scheduling options return `Ok(None)`;
+Clock-only schedules support overnight durations but require dated input for
+calendar exclusions and month/year durations. Timezones, other date formats
+and unsupported scheduling options return `Ok(None)`;
 unknown IDs and cyclic dependencies do too. No current-date marker is drawn.
 See the [backend contract](https://github.com/garlab/mermaid-rs-renderer/blob/fork-release/docs/gantt.md)
 for the exact subset. Unsupported timeline sections retain source. Nonfinite

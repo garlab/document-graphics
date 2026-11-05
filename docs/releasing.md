@@ -21,8 +21,9 @@ consumers use a versioned registry dependency; local overrides are temporary.
 
 ## Version 0.1.7 (unreleased)
 
-Adds native Gantt schedules through backend 0.2.0, with bounded task/date
-collections and complete source fallback on unsupported syntax. The public
+Adds native Gantt schedules through backend 0.2.0, including clock/date-time
+formats and exact millisecond durations, with bounded task/date collections
+and complete source fallback on unsupported syntax. The public
 worker API, protocol, sandbox and raster limits retain their existing behavior.
 
 Publish `document-graphics-mermaid` 0.2.0 first, then resolve its registry package

@@ -468,8 +468,41 @@ mod tests {
             "gantt\nA: 2026-02-29, 1d",
             "gantt\nA: a, after b, 1d\nB: b, after a, 1d",
             "gantt\nA: after missing, 1d",
-            "gantt\nA: 2026-01-01, 30m",
-            "gantt\naxisFormat %H:%M\nA: 2026-01-01, 1d",
+            "gantt\nA: 2026-01-01, 30q",
+            "gantt\naxisFormat %Z\nA: 2026-01-01, 1d",
+        ] {
+            assert!(render(source, false).is_none(), "accepted {source}");
+        }
+    }
+
+    #[test]
+    fn gantt_sub_day_times_have_precise_axes_and_bounded_rasters() {
+        for source in [
+            "gantt\n dateFormat HH:mm\n axisFormat %H:%M\n A: a, 09:00, 1.5h\n B: after a, 30m",
+            "gantt\n dateFormat YYYY-MM-DDTHH:mm:ss.SSS\n axisFormat %S.%L\n A: 9999-01-01T12:00:00.000, 1ms\n B: 2ms",
+        ] {
+            for light in [false, true] {
+                let svg = diagram_svg(source, light, Background::Transparent).unwrap();
+                assert!(svg.contains(if source.contains(".SSS") {
+                    "00.001"
+                } else {
+                    "09:00"
+                }));
+                let raster = super::render(
+                    source,
+                    light,
+                    Background::Transparent,
+                    RasterOptions::scaled(2.),
+                )
+                .unwrap();
+                assert!(raster.width as usize * raster.height as usize <= MAX_PIXELS);
+                assert!(raster.rgba.as_chunks::<4>().0.iter().any(|p| p[3] == 0));
+            }
+        }
+        for source in [
+            "gantt\ndateFormat HH:mm\nexcludes weekends\nA: 09:00, 1h",
+            "gantt\ndateFormat HH:mm\nA: 23:00, 01:00",
+            "gantt\ndateFormat HH:mm:ss.SSS\nA: 09:00:00.000, 0.5ms",
         ] {
             assert!(render(source, false).is_none(), "accepted {source}");
         }
