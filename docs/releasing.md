@@ -25,7 +25,7 @@ When also working on the backend, add it to the same untracked patch table:
 document-graphics-mermaid = { path = "../document-graphics-mermaid" }
 ```
 
-## Version 0.1.9 (unreleased)
+## Version 0.1.9
 
 Image previews recognize SVG files that begin with a `DOCTYPE` without an XML
 declaration. These use the existing SVG decoder and keep external resources
@@ -50,18 +50,16 @@ processes. Production deadlines and cancellation behavior are unchanged.
 Isolated consumer checkouts used this library with the published Mermaid backend:
 Gloss passed 83 Rust tests, 61 direct-output checks and 19 pager/watch checks.
 Plastext passed its application build check, image snapshot/broker integration,
-and 40 Mermaid worker renders. Consumer version pins remain on their published
-releases until 0.1.9 is available.
+and 40 Mermaid worker renders. These checks used temporary library overrides before publication.
 
-Release through the existing tag workflow after pushing `main` and checking CI:
-
-```sh
-git tag -a v0.1.9 -m release
-git push origin v0.1.9
-```
-
-After publication, consumers can update their version pins to 0.1.9 and remove
-any temporary document-graphics override. See [Publication](#publication).
+Version 0.1.9 is published on crates.io. Its 36 source, test, fixture and font
+files, README, license and original manifest match the reviewed release tag.
+Consumers can pin the registry version without a local document-graphics or
+Mermaid backend override. Registry adoption checks passed Gloss's 83 Rust tests,
+61 direct-output checks, 19 pager/watch checks, Clippy and Rust 1.90. Plastext's
+application build, image integration, 40 Mermaid renders and four diagram UI
+tests also passed against the registry package. See [Publication](#publication)
+for future releases.
 
 ## Version 0.1.8
 
