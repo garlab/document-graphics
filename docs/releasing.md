@@ -41,6 +41,12 @@ Rust 1.90 and the all-feature publishing dry run passed. The package audit check
 all 41 files, reviewed source bytes, fixtures, font licenses and registry-only
 dependency metadata.
 
+The partial-reply cancellation test now waits for the child's acknowledgement
+instead of racing a delayed thread against a 100 ms timeout. Cancellation has a
+separate test backstop, and cleanup is verified through the kill signal and
+reaped process. The regression passed 200 runs with eight concurrent test
+processes. Production deadlines and cancellation behavior are unchanged.
+
 Isolated consumer checkouts used this library with the published Mermaid backend:
 Gloss passed 83 Rust tests, 61 direct-output checks and 19 pager/watch checks.
 Plastext passed its application build check, image snapshot/broker integration,

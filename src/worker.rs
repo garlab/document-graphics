@@ -454,51 +454,80 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn timeouts_and_cancellation_kill_and_reap_partial_replies() {
-        for cancel_after in [None, Some(Duration::from_millis(30))] {
-            let child = Command::new("sh")
-                .args(["-c", "printf '\\001'; exec sleep 30"])
+        use std::os::unix::process::ExitStatusExt;
+
+        const SOURCE: &str = "flowchart LR; A-->B";
+        for cancel_in_flight in [false, true] {
+            // The cancellation case reads the request before sending one reply
+            // byte and acknowledging it on stderr. A sleep cannot establish this
+            // ordering when the test runner is busy.
+            let request_bytes = if cancel_in_flight {
+                25 + SOURCE.len()
+            } else {
+                0
+            };
+            let mut child = Command::new("sh")
+                .args([
+                    "-c",
+                    "dd bs=1 count=\"$1\" of=/dev/null 2>/dev/null; printf '\\001'; printf '\\001' >&2; exec sleep 60",
+                    "partial-reply-worker",
+                    &request_bytes.to_string(),
+                ])
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
-                .stderr(Stdio::null())
+                .stderr(Stdio::piped())
                 .spawn()
                 .unwrap();
+            let mut ready = child.stderr.take().unwrap();
             let mut worker = Worker::connect(child).unwrap();
             let pid = worker.child.id();
             let cancel = Arc::new(AtomicBool::new(false));
-            let cancellation = cancel_after.map(|duration| {
+            let cancellation = if cancel_in_flight {
                 let cancel = cancel.clone();
-                thread::spawn(move || {
-                    thread::sleep(duration);
+                Some(thread::spawn(move || {
+                    let mut marker = [0];
+                    ready.read_exact(&mut marker).unwrap();
+                    assert_eq!(marker, [1]);
                     cancel.store(true, Ordering::Relaxed);
-                })
-            });
-            let started = Instant::now();
+                }))
+            } else {
+                // Start the timeout only once the child has emitted its partial
+                // reply, so process startup is not part of the deadline test.
+                let mut marker = [0];
+                ready.read_exact(&mut marker).unwrap();
+                assert_eq!(marker, [1]);
+                None
+            };
+            // Only the timeout case has a short deadline. The cancellation case
+            // has a generous failure backstop, not a competing timing assertion.
+            let timeout = if cancel_in_flight {
+                Duration::from_secs(30)
+            } else {
+                Duration::from_millis(100)
+            };
             let error = worker
-                .render(
-                    "flowchart LR; A-->B",
-                    false,
-                    RasterOptions::scaled(1.),
-                    Duration::from_millis(100),
-                    &cancel,
-                )
+                .render(SOURCE, false, RasterOptions::scaled(1.), timeout, &cancel)
                 .err()
                 .unwrap();
+            if let Some(thread) = cancellation {
+                thread.join().unwrap();
+            }
             assert_eq!(
                 error.kind(),
-                if cancel_after.is_some() {
+                if cancel_in_flight {
                     io::ErrorKind::Interrupted
                 } else {
                     io::ErrorKind::TimedOut
                 }
             );
             assert!(worker.requests.is_none());
-            if let Some(thread) = cancellation {
-                thread.join().unwrap();
-            }
-            assert!(started.elapsed() < Duration::from_secs(3));
             // SAFETY: signal zero only checks whether the reaped child exists.
             assert_eq!(unsafe { libc::kill(pid as libc::pid_t, 0) }, -1);
             assert_eq!(io::Error::last_os_error().raw_os_error(), Some(libc::ESRCH));
+            assert_eq!(
+                worker.child.try_wait().unwrap().unwrap().signal(),
+                Some(libc::SIGKILL)
+            );
             assert!(
                 worker
                     .render(
