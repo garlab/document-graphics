@@ -30,14 +30,15 @@ or tile without retaining an image for every item.
 
 ## Integration
 
-Requires Rust 1.90 or newer. Version 0.1.7 adds native Gantt support through
-the published `document-graphics-mermaid` 0.2.0 backend. See
+Requires Rust 1.90 or newer. Version 0.1.8 pins the
+`document-graphics-mermaid` 0.2.1 backend, preserving the native Gantt support
+introduced in 0.1.7. See
 [local dependency overrides](https://github.com/garlab/document-graphics/blob/main/docs/releasing.md#local-dependency-overrides)
 when developing this library alongside a consumer.
 
 ```toml
 [dependencies]
-document-graphics = "0.1.7"
+document-graphics = "0.1.8"
 ```
 
 Handle the private worker argument before initializing the application:
@@ -92,7 +93,7 @@ Clock-only schedules support overnight durations but require dated input for
 calendar exclusions and month/year durations. Timezones, other date formats
 and unsupported scheduling options return `Ok(None)`;
 unknown IDs and cyclic dependencies do too. No current-date marker is drawn.
-See the [backend contract](https://github.com/garlab/mermaid-rs-renderer/blob/fork-release/docs/gantt.md)
+See the [backend contract](https://github.com/garlab/document-graphics-mermaid/blob/main/docs/gantt.md)
 for the exact subset. Unsupported timeline sections retain source. Nonfinite
 chart numbers are rejected.
 
@@ -315,16 +316,17 @@ deadline checks before the application receives it.
 ## Development
 
 This is a standalone library repository, shared by mdviewer and Plastext.
-The Mermaid backend is pinned to version 0.2.0 of the
+The Mermaid backend is pinned to version 0.2.1 of the
 [`document-graphics-mermaid`](https://crates.io/crates/document-graphics-mermaid)
-crate, maintained in a [separate fork](https://github.com/garlab/mermaid-rs-renderer).
+crate, maintained in a [separate fork](https://github.com/garlab/document-graphics-mermaid).
 It provides caller-supplied font metrics, complete ER key badges, chart-label
 contrast fixes, bounded routing policies for large flowcharts and validated
 Gantt schedules. Its default
 features stay disabled: this library owns SVG rasterization and does not need
 the backend's CLI or PNG renderer.
-Release builds use crates.io dependencies; until backend 0.2.0 is published,
-local integration requires its ignored Cargo override.
+Release builds use crates.io dependencies. Local backend development uses an
+ignored Cargo override pointing to `../document-graphics-mermaid`; remove it
+when validating a registry release.
 
 ```sh
 cargo fmt --all --check

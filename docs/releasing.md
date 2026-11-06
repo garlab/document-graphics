@@ -19,21 +19,57 @@ Run Cargo from that consumer's root. Keep the library checkout outside its
 `target/` directory so cleaning build artifacts cannot remove source. Published
 consumers use a versioned registry dependency; local overrides are temporary.
 
-## Version 0.1.7 (unreleased)
+When also working on the backend, add it to the same untracked patch table:
+
+```toml
+document-graphics-mermaid = { path = "../document-graphics-mermaid" }
+```
+
+## Version 0.1.8 (unreleased)
+
+Pins `document-graphics-mermaid` 0.2.1 and updates references to its renamed
+repository and `main` branch. The backend also fixes vertical canvas bounds for
+wrapped quadrant point labels while preserving their plotted coordinates.
+Very tall labels can expand the canvas instead of being clipped. This library's
+worker protocol, public API and resource limits remain unchanged.
+
+Backend 0.2.1 is published. This checkout resolves it from crates.io without a
+backend override; `Cargo.lock` records the registry source and checksum.
+Consumers testing this pending library version need only the document-graphics
+override shown above.
+
+Local validation with the 0.2.1 checkout passed all-feature library tests,
+30 Mermaid worker renders, image-worker integration, documentation tests,
+Clippy and Rust 1.90. The terminal consumer passed 75 Rust tests and 53
+direct-output checks against the pending library version.
+
+Registry validation on 2026-11-06 passed the library's all-feature and worker
+suites, Rust 1.90, the terminal consumer's 75 Rust tests, and the all-feature
+publishing dry run. All 61 published backend source files, its regression test,
+README and original manifest match the tested checkout. No temporary backend
+override remains in either consumer's local configuration.
+
+The final release checks are:
+
+```sh
+cargo test --all-features --locked
+cargo +1.90.0 check --all-targets --all-features --locked
+cargo publish -p document-graphics --all-features --dry-run --locked
+```
+
+Commit the dependency and lockfile changes, push `main`, and wait for CI before
+tagging `v0.1.8`. The version-tag workflow publishes the library. After publication,
+consumers can remove their document-graphics override and refresh their lockfiles.
+
+## Version 0.1.7
 
 Adds native Gantt schedules through backend 0.2.0, including clock/date-time
 formats and exact millisecond durations, with bounded task/date collections
 and complete source fallback on unsupported syntax. The public
 worker API, protocol, sandbox and raster limits retain their existing behavior.
 
-Backend `document-graphics-mermaid` 0.2.0 is published. This checkout resolves it
-from crates.io without a local backend override; Cargo.lock records its registry
-source and checksum. No math release is needed. Consumers testing the pending
-library release need only the document-graphics override shown above.
-
-Publish this crate through the version-tag workflow after the registry release
-checks below. After publication, remove consumer overrides and restore their
-registry lockfiles. mdviewer's Gantt documentation records coverage and measurements.
+This version is published on crates.io with backend `document-graphics-mermaid`
+0.2.0. The release validation below records that backend version.
 
 ### Release validation
 
@@ -59,19 +95,6 @@ integration checks also pass without a backend override: 75 terminal-viewer
 Rust tests, 53 direct-output checks, 16 pager/watch checks, 30 GUI worker renders
 and two Mermaid UI tests. All 38 terminal/export comparisons are byte-identical
 to the validated local build.
-
-From this checkout, the final release checks are:
-
-```sh
-cargo test --all-features --locked
-cargo +1.90.0 check --all-targets --all-features --locked
-cargo publish -p document-graphics --all-features --dry-run --locked
-```
-
-Commit the registry lockfile update, push `main`, and wait for CI before tagging
-`v0.1.7`. The existing version-tag workflow publishes the library; no manual
-upload is needed for document-graphics. After publication, consumers can remove
-their remaining document-graphics override and refresh their lockfiles.
 
 ## Version 0.1.6
 
@@ -138,7 +161,7 @@ The backend's routing comparison preserved byte-identical SVG across all 61
 benchmark fixtures; the separate quadrant color fix intentionally changes axis
 text in themes with different primary and secondary text colors. Its native
 32-node/60-edge chain benchmark improved from 368.4 to 221.0 ms for layout.
-See the fork's [routing measurements](https://github.com/garlab/mermaid-rs-renderer/blob/fork-release/docs/flowchart-routing-architecture.md#routing-comparison-cost)
+See the fork's [routing measurements](https://github.com/garlab/document-graphics-mermaid/blob/main/docs/flowchart-routing-architecture.md#routing-comparison-cost)
 for methodology and limits. These measurements describe the backend change,
 not a new measurement of this library's entire worker pipeline.
 
@@ -292,7 +315,7 @@ After review and consumer validation:
 The Mermaid backend is maintained and published separately as
 [`document-graphics-mermaid`](https://crates.io/crates/document-graphics-mermaid).
 When changing it, follow the fork's
-[release guide](https://github.com/garlab/mermaid-rs-renderer/blob/fork-release/docs/release.md)
+[release guide](https://github.com/garlab/document-graphics-mermaid/blob/main/docs/release.md)
 and publish the reviewed backend version first. Pin that version in this
 library's `Cargo.toml`, keep `default-features = false`, and refresh `Cargo.lock`.
 Confirm the backend's registry source and checksum in the lockfile, then repeat
@@ -300,8 +323,9 @@ the library and consumer checks above. Backend upgrades may change layout even
 when the adapter API is unchanged; review any changed fixture dimensions or
 rendered output and compare performance and memory use.
 
-Backend 0.2.0 is published, so consumers need only the document-graphics override
-for local integration tests. Release document-graphics through the existing workflow:
+Once the pinned backend version is published, consumers need only the
+document-graphics override for local integration tests. Release this library
+through the existing workflow:
 
 1. Set the new version in `Cargo.toml`, run `cargo check` so `Cargo.lock` follows,
    commit, and push `main`.
