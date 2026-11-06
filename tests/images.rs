@@ -142,6 +142,43 @@ fn run() {
         icon.render(&icon_info, vec![icon_info.overview(0)], &cancel)
             .is_ok()
     );
+    // The worker gets a descriptor, not a filename: recognize supported SVG prologs.
+    // A public DOCTYPE without an XML declaration is common in exported SVGs.
+    // The external DTD must not be needed to render the document.
+    for prefix in [
+        "",
+        "<?xml version=\"1.0\" encoding=\"utf-8\"?>",
+        "<!-- exported artwork -->",
+        "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"https://example.invalid/svg.dtd\">",
+        "\u{feff} \n<!DOCTYPE svg SYSTEM \"https://example.invalid/svg.dtd\">",
+    ] {
+        let path = directory.path().join("vector-without-extension");
+        std::fs::write(
+            &path,
+            format!(
+                r#"{prefix}<svg xmlns="http://www.w3.org/2000/svg" width="16" height="12"><rect width="16" height="12" fill="red"/></svg>"#
+            ),
+        )
+        .unwrap();
+        let (vector, info) = Document::open(&path, &cancel)
+            .unwrap_or_else(|error| panic!("SVG prolog {prefix:?}: {error}"));
+        assert_eq!(
+            (info.width, info.height, info.format.as_str()),
+            (16, 12, "SVG")
+        );
+        let frame = vector
+            .render(&info, vec![info.overview(0)], &cancel)
+            .unwrap();
+        assert!(
+            frame.pixels[0]
+                .rgba
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .all(|p| *p == [255, 0, 0, 255])
+        );
+    }
+    println!("SVG prologs render without external DTD access passed");
     let svg = directory.path().join("regions.svg");
     std::fs::write(&svg,r##"<svg xmlns="http://www.w3.org/2000/svg" width="10000" height="10000"><rect x="9000" y="9000" width="1000" height="1000" fill="#ff0000"/><image href="https://example.invalid/no-network.png" width="10" height="10"/></svg>"##).unwrap();
     let (vector, metadata) = Document::open(&svg, &cancel).unwrap();

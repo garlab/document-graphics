@@ -33,6 +33,10 @@ wrapped quadrant point labels while preserving their plotted coordinates.
 Very tall labels can expand the canvas instead of being clipped. This library's
 worker protocol, public API and resource limits remain unchanged.
 
+Image previews also recognize SVG files that begin with a `DOCTYPE` without an
+XML declaration. These use the existing SVG decoder and keep external resources
+disabled; no DTD download is required.
+
 Backend 0.2.1 is published. This checkout resolves it from crates.io without a
 backend override; `Cargo.lock` records the registry source and checksum.
 Consumers testing this pending library version need only the document-graphics

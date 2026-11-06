@@ -31,7 +31,11 @@ impl Decoder {
         let png = head[..n].starts_with(b"\x89PNG\r\n\x1a\n");
         let text = String::from_utf8_lossy(&head[..n]);
         let text = text.trim_start_matches('\u{feff}').trim_start();
-        if text.starts_with("<svg") || text.starts_with("<?xml") || text.starts_with("<!--") {
+        if text.starts_with("<svg")
+            || text.starts_with("<?xml")
+            || text.starts_with("<!--")
+            || text.starts_with("<!DOCTYPE")
+        {
             let mut bytes = Vec::new();
             File::open(path)
                 .and_then(|mut f| {
