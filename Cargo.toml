@@ -3,7 +3,7 @@ resolver = "3"
 
 [package]
 name = "document-graphics"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2024"
 rust-version = "1.90"
 description = "Render graphics from untrusted documents to RGBA, with resource limits and isolated workers."

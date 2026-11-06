@@ -30,7 +30,7 @@ or tile without retaining an image for every item.
 
 ## Integration
 
-Requires Rust 1.90 or newer. Version 0.1.8 pins the
+Requires Rust 1.90 or newer. Version 0.1.9 pins the
 `document-graphics-mermaid` 0.2.1 backend, preserving the native Gantt support
 introduced in 0.1.7. See
 [local dependency overrides](https://github.com/garlab/document-graphics/blob/main/docs/releasing.md#local-dependency-overrides)
@@ -38,7 +38,7 @@ when developing this library alongside a consumer.
 
 ```toml
 [dependencies]
-document-graphics = "0.1.8"
+document-graphics = "0.1.9"
 ```
 
 Handle the private worker argument before initializing the application:
@@ -315,7 +315,7 @@ deadline checks before the application receives it.
 
 ## Development
 
-This is a standalone library repository, shared by mdviewer and Plastext.
+This is a standalone library repository, shared by gloss and Plastext.
 The Mermaid backend is pinned to version 0.2.1 of the
 [`document-graphics-mermaid`](https://crates.io/crates/document-graphics-mermaid)
 crate, maintained in a [separate fork](https://github.com/garlab/document-graphics-mermaid).

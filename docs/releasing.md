@@ -25,7 +25,39 @@ When also working on the backend, add it to the same untracked patch table:
 document-graphics-mermaid = { path = "../document-graphics-mermaid" }
 ```
 
-## Version 0.1.8 (unreleased)
+## Version 0.1.9 (unreleased)
+
+Image previews recognize SVG files that begin with a `DOCTYPE` without an XML
+declaration. These use the existing SVG decoder and keep external resources
+disabled; no DTD download is required. Regression coverage includes plain and
+external-doctype SVG files and invalid input. The Mermaid backend remains pinned
+to published version 0.2.1. Public APIs, worker protocols and resource limits are
+unchanged.
+
+Validation passed the minimal, portable-image, image-worker and all-feature test
+configurations, including 42 all-feature library tests, four documentation tests,
+30 Mermaid worker renders and native image integration. Formatting, Clippy,
+Rust 1.90 and the all-feature publishing dry run passed. The package audit checked
+all 41 files, reviewed source bytes, fixtures, font licenses and registry-only
+dependency metadata.
+
+Isolated consumer checkouts used this library with the published Mermaid backend:
+Gloss passed 83 Rust tests, 61 direct-output checks and 19 pager/watch checks.
+Plastext passed its application build check, image snapshot/broker integration,
+and 40 Mermaid worker renders. Consumer version pins remain on their published
+releases until 0.1.9 is available.
+
+Release through the existing tag workflow after pushing `main` and checking CI:
+
+```sh
+git tag -a v0.1.9 -m release
+git push origin v0.1.9
+```
+
+After publication, consumers can update their version pins to 0.1.9 and remove
+any temporary document-graphics override. See [Publication](#publication).
+
+## Version 0.1.8
 
 Pins `document-graphics-mermaid` 0.2.1 and updates references to its renamed
 repository and `main` branch. The backend also fixes vertical canvas bounds for
@@ -33,14 +65,8 @@ wrapped quadrant point labels while preserving their plotted coordinates.
 Very tall labels can expand the canvas instead of being clipped. This library's
 worker protocol, public API and resource limits remain unchanged.
 
-Image previews also recognize SVG files that begin with a `DOCTYPE` without an
-XML declaration. These use the existing SVG decoder and keep external resources
-disabled; no DTD download is required.
-
-Backend 0.2.1 is published. This checkout resolves it from crates.io without a
-backend override; `Cargo.lock` records the registry source and checksum.
-Consumers testing this pending library version need only the document-graphics
-override shown above.
+Version 0.1.8 is published with backend 0.2.1. The lockfile records the
+backend's registry source and checksum; no backend override is required.
 
 Local validation with the 0.2.1 checkout passed all-feature library tests,
 30 Mermaid worker renders, image-worker integration, documentation tests,
@@ -52,18 +78,6 @@ suites, Rust 1.90, the terminal consumer's 75 Rust tests, and the all-feature
 publishing dry run. All 61 published backend source files, its regression test,
 README and original manifest match the tested checkout. No temporary backend
 override remains in either consumer's local configuration.
-
-The final release checks are:
-
-```sh
-cargo test --all-features --locked
-cargo +1.90.0 check --all-targets --all-features --locked
-cargo publish -p document-graphics --all-features --dry-run --locked
-```
-
-Commit the dependency and lockfile changes, push `main`, and wait for CI before
-tagging `v0.1.8`. The version-tag workflow publishes the library. After publication,
-consumers can remove their document-graphics override and refresh their lockfiles.
 
 ## Version 0.1.7
 
@@ -107,7 +121,7 @@ diagram canvases. Existing `Worker::render` callers keep their themed canvas and
 the NPV1 request format. Transparent requests use the NPV2 extension; the child
 accepts both versions and rejects unknown flags before reading the source.
 
-mdviewer opts into transparency and chooses raster scale from terminal cell
+gloss opts into transparency and chooses raster scale from terminal cell
 height. That sizing and cache policy stays in the application. Checks cover
 transparency and antialiasing, canvas-colored nodes, ER table fills, timeline
 backgrounds, protocol flags and mixed opaque/transparent worker requests. The
@@ -116,7 +130,7 @@ backgrounds, protocol flags and mixed opaque/transparent worker requests. The
 ## Version 0.1.5
 
 This release adds optional PGN/FEN chess rendering and bounded image APIs.
-Plastext uses `sgf`, `chess` and `image-native`; mdviewer enables only `images`
+Plastext uses `sgf`, `chess` and `image-native`; gloss enables only `images`
 and retains the strict document SVG renderer. Version 0.1.5 is published on
 crates.io; both consumers completed registry validation before the 0.1.6 work.
 
@@ -146,7 +160,7 @@ verification includes optional modules and their fixtures. docs.rs builds all
 features so the chess and image APIs appear in the published documentation.
 
 Release validation passed the four feature combinations above, Clippy, Rust
-1.90, and package verification. mdviewer passed 68 Rust tests, 44 direct-output
+1.90, and package verification. gloss passed 68 Rust tests, 44 direct-output
 PTY tests and 11 pager/watch PTY tests. Plastext passed the assets, math, platform
 and UI tests, including its image snapshot/broker and Mermaid worker integration
 tests. These are automated checks; native GUI playback and terminal emulator
@@ -233,7 +247,7 @@ The package includes library sources, tests, README, license and Cargo metadata.
 For renderer changes, check both consumers with
 [local dependency overrides](#local-dependency-overrides):
 
-- In mdviewer: run Rust tests and `tests/terminal_smoke.py` against a built
+- In gloss: run Rust tests and `tests/terminal_smoke.py` against a built
   binary; inspect graphics in a compatible terminal at normal and narrow widths.
 - In Plastext: run the platform Mermaid worker and UI integration tests; inspect
   diagrams in both appearances, zoom, split panes, resizing and Source/Preview.
@@ -255,7 +269,7 @@ The 13-diagram terminal fixture retained its text, dimensions and placement at
 24 and 100 columns in both themes. Reviewed pixel changes were confined to
 arrowheads, the final-state symbol and timeline/journey text colors.
 
-Performance was measured with mdviewer's `bench/run.py`: release builds, one
+Performance was measured with gloss's `bench/run.py`: release builds, one
 warm-up and three measured processes per case, a drained 100-column PTY with
 10 × 20-pixel cells, Apple M2 Pro / 16 GiB, macOS 26.4.1 and Rust 1.99.0.
 These times include startup and worker execution, but exclude emulator painting.
@@ -276,7 +290,7 @@ updates. A separate run with process sampling confirmed the slowdown. Its sample
 combined CLI/worker peak RSS was
 13.4 → 13.5 MiB, while the 13-diagram fixture was 19.2 → 18.5 MiB. Sampling can
 miss short peaks, so these are observations rather than memory bounds. The
-mixed-document peak RSS was 58.0 → 58.1 MiB. The mdviewer release binary grew by
+mixed-document peak RSS was 58.0 → 58.1 MiB. The gloss release binary grew by
 212 KiB (15.79 → 16.00 MiB); enabled runtime dependencies did not increase.
 
 ### Backend 0.1.1 performance check
@@ -284,7 +298,7 @@ mixed-document peak RSS was 58.0 → 58.1 MiB. The mdviewer release binary grew 
 The 2026-11-01 update pins the published backend 0.1.1. Its routing optimization
 reuses shape polygons and skips intersection sampling for disjoint segments.
 Both lockfiles changed only the backend version and checksum from the preceding
-local integration state; mdviewer still used its local document-graphics override.
+local integration state; gloss still used its local document-graphics override.
 
 The same machine, release profile, corpora and PTY methodology above gave these
 medians, with one warm-up and three fresh measured processes per case. Both
@@ -306,7 +320,7 @@ Inputs and raw results remain outside the repositories; earlier baselines are
 unchanged.
 
 All 13 diagrams retained byte-identical terminal output at 24 and 100 columns in
-both themes, including pixels and placement. Library and mdviewer Rust tests,
+both themes, including pixels and placement. Library and gloss Rust tests,
 26 shared-worker fixture renders, all 43 terminal checks, formatting, Clippy and
 Rust 1.90 checks passed. Timing excludes emulator painting.
 
