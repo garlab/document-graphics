@@ -1,5 +1,8 @@
 # document-graphics
 
+[crates.io](https://crates.io/crates/document-graphics) ·
+[API documentation](https://docs.rs/document-graphics)
+
 Bounded Mermaid/SVG rendering, optional image decoding, and Go/chess boards for terminal and GUI applications. The
 crate returns straight RGBA pixels and logical dimensions. It has no UI framework,
 Markdown document model, application cache, broker or background service.
@@ -18,28 +21,25 @@ The library renders the graphical content of documents independently of their
 layout or user interface. Today it supports Mermaid diagrams, a restricted
 SVG subset, Go positions from SGF records (`sgf` feature), and standard chess
 from PGN/FEN records (`chess` feature), and bounded image decoding (`images`,
-`image-worker` and `image-native` features, available from 0.1.5). Other diagram
+`image-worker` and `image-native` features). Other diagram
 formats and music notation are possible future modules, not implemented here.
 Applications own document layout, interaction, scheduling and cache budgets.
-Equation layout remains in `katex-native`.
+Equation layout belongs to [`katex-native`](https://crates.io/crates/katex-native).
 
-New backends should remain optional and initialize only when used. Their own
-input limits and platform isolation requirements must be explicit. Future APIs
-may retain a bounded parsed model and render a selected fragment, position, page
-or tile without retaining an image for every item.
+## Installation
 
-## Integration
-
-Requires Rust 1.90 or newer. Version 0.1.9 pins the
-`document-graphics-mermaid` 0.2.1 backend, preserving the native Gantt support
-introduced in 0.1.7. See
-[local dependency overrides](https://github.com/garlab/document-graphics/blob/main/docs/releasing.md#local-dependency-overrides)
-when developing this library alongside a consumer.
-
-```toml
-[dependencies]
-document-graphics = "0.1.9"
+```sh
+cargo add document-graphics                      # Mermaid and strict SVG
+cargo add document-graphics --features sgf,chess # Go and chess boards
+cargo add document-graphics --features images    # PNG/JPEG thumbnails
 ```
+
+Requires Rust 1.90 or newer. Mermaid layout comes from the
+[`document-graphics-mermaid`](https://crates.io/crates/document-graphics-mermaid)
+backend, a native Rust renderer pinned to an exact version; no Node.js or
+browser is involved.
+
+## Mermaid diagrams
 
 Handle the private worker argument before initializing the application:
 
@@ -102,17 +102,9 @@ paths and does not fetch resources. Only the internal Mermaid route permits
 bounded arrow markers. Mermaid parsing and layout are private to the worker;
 there is no public in-process Mermaid entry point.
 
-The expanded Mermaid limits are available from 0.1.2, using the published
-`document-graphics-mermaid` backend. They retain the existing worker memory
-and raster budgets.
-
-Version 0.1.3 pins `document-graphics-mermaid` 0.1.3 for faster flowchart route
-comparisons and improved quadrant-axis label contrast. The public API, worker
-protocol, feature defaults and resource limits are unchanged.
-
 ## SGF Go records
 
-Enable the optional `sgf` feature (available from 0.1.1). It adds no dependencies,
+Enable the optional `sgf` feature. It adds no dependencies,
 network access or runtime installation requirements. Parse a bounded collection,
 reconstruct the selected board, and render it off the application's UI thread:
 
@@ -305,43 +297,13 @@ The library owns these mechanisms. A terminal app can retain a five-second total
 budget; a desktop app can reuse a worker through a bounded queue and retire it on
 idle. Neither policy is imposed on the other application.
 
-The Mermaid and image clients share private cancellation/deadline guards,
-20 ms macOS memory-sampling checks, and child termination/reaping. Their wire
-protocols, I/O loops, error reporting and sandbox profiles remain separate.
-Request limits, timeouts and application queue/cache policies are unchanged.
 Mermaid retains best-effort memory sampling; image requests fail if their worker
 cannot be monitored. A completed reply still has to pass its cancellation and
 deadline checks before the application receives it.
 
-## Development
+## Contributing and license
 
-This is a standalone library repository, shared by gloss and Plastext.
-The Mermaid backend is pinned to version 0.2.1 of the
-[`document-graphics-mermaid`](https://crates.io/crates/document-graphics-mermaid)
-crate, maintained in a [separate fork](https://github.com/garlab/document-graphics-mermaid).
-It provides caller-supplied font metrics, complete ER key badges, chart-label
-contrast fixes, bounded routing policies for large flowcharts and validated
-Gantt schedules. Its default
-features stay disabled: this library owns SVG rasterization and does not need
-the backend's CLI or PNG renderer.
-Release builds use crates.io dependencies. Local backend development uses an
-ignored Cargo override pointing to `../document-graphics-mermaid`; remove it
-when validating a registry release.
-
-```sh
-cargo fmt --all --check
-cargo clippy --all-targets --all-features --no-deps --locked -- -D warnings
-cargo test --all-features --locked
-cargo +1.90.0 check --all-targets --all-features --locked
-```
-
-Shared renderer, SVG and protocol tests belong here. Application integration and
-policy tests stay with the consumers. On macOS, worker tests must run outside an
-enclosing sandbox so the child can install its own sandbox.
-
-See [release checks](https://github.com/garlab/document-graphics/blob/main/docs/releasing.md)
-for testing changes in the consumers, packaging and consumer validation.
-
-MIT; see [LICENSE](https://github.com/garlab/document-graphics/blob/main/LICENSE).
+See [CONTRIBUTING.md](https://github.com/garlab/document-graphics/blob/main/CONTRIBUTING.md)
+to work on the library. MIT; see [LICENSE](https://github.com/garlab/document-graphics/blob/main/LICENSE).
 `katex-native` includes KaTeX fonts under OFL-1.1. Noto Sans assets and their
 license/provenance are in [fonts](https://github.com/garlab/document-graphics/blob/main/fonts/README.md).

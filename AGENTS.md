@@ -5,7 +5,9 @@
   Preserve the public copyright attribution and license notices.
 - Keep this repository a UI-independent rendering library. Applications own
   document layout, interaction, queues, cache budgets and worker idle policies.
-- Describe implemented behavior and platform limits accurately in README.md.
+- Describe implemented behavior and platform limits accurately in README.md,
+  which is written for users and is also the crate's documentation page (keep
+  its links absolute). Contributor guidance belongs in CONTRIBUTING.md.
   Possible future formats must not appear as supported capabilities.
 - Preserve resource limits, source fallbacks, cancellation and process cleanup.
   Expensive backend work must stay off consumer UI threads.
