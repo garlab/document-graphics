@@ -9,6 +9,8 @@ mod process;
 #[cfg(feature = "sgf")]
 pub mod sgf;
 pub mod svg;
+#[cfg(feature = "tikz")]
+pub mod tikz;
 pub mod worker;
 
 pub const MAX_PIXELS: usize = 1_000_000;

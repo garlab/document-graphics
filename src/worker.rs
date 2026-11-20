@@ -25,7 +25,7 @@ pub fn worker_main() -> io::Result<()> {
     serve(&mut io::stdin().lock(), &mut io::stdout().lock())
 }
 
-fn restrict_worker() -> io::Result<()> {
+pub(crate) fn restrict_worker() -> io::Result<()> {
     #[cfg(unix)]
     {
         // SAFETY: valid pointers to process-local resource limits. Fail closed if
@@ -346,7 +346,7 @@ impl Drop for Worker {
     }
 }
 
-fn request_error(error: RequestError) -> io::Error {
+pub(crate) fn request_error(error: RequestError) -> io::Error {
     match error {
         RequestError::Cancelled => io::Error::new(io::ErrorKind::Interrupted, "Diagram cancelled"),
         RequestError::TimedOut => io::Error::new(io::ErrorKind::TimedOut, "Diagram timed out"),

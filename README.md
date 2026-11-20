@@ -18,7 +18,7 @@ and foreign content.
 ## Scope
 
 The library renders the graphical content of documents independently of their
-layout or user interface. Today it supports Mermaid diagrams, a restricted
+layout or user interface. Today it supports Mermaid diagrams, TikZ pictures on macOS (`tikz` feature), a restricted
 SVG subset, Go positions from SGF records (`sgf` feature), and standard chess
 from PGN/FEN records (`chess` feature), and bounded image decoding (`images`,
 `image-worker` and `image-native` features). Other diagram
@@ -32,6 +32,7 @@ Equation layout belongs to [`katex-native`](https://crates.io/crates/katex-nativ
 cargo add document-graphics                      # Mermaid and strict SVG
 cargo add document-graphics --features sgf,chess # Go and chess boards
 cargo add document-graphics --features images    # PNG/JPEG thumbnails
+cargo add document-graphics --features tikz      # Isolated TikZ pictures on macOS
 ```
 
 Requires Rust 1.90 or newer. Mermaid layout comes from the
@@ -101,6 +102,15 @@ Use `svg::rasterize(source, options)` for bounded local SVG. It accepts no file
 paths and does not fetch resources. Only the internal Mermaid route permits
 bounded arrow markers. Mermaid parsing and layout are private to the worker;
 there is no public in-process Mermaid entry point.
+
+## TikZ pictures
+
+Enable the optional `tikz` feature to render complete LaTeX TikZ pictures on macOS.
+Dispatch `tikz::WORKER_ARGUMENT` to `tikz::worker_main()` and call `tikz::render`
+from a background thread with the source, optional dark palette, raster options,
+timeout and cancellation flag. Each figure runs in a fresh sandbox with embedded
+fonts. Pictures use 150% reading dimensions and fit the requested pixel bounds.
+Unsupported input, other platforms and exhausted limits return an error for source fallback.
 
 ## SGF Go records
 
